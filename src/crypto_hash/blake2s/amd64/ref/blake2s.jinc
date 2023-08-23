@@ -1,0 +1,182 @@
+require "blake2s_globals.jinc"
+
+inline fn __G(stack u32[16] round_state, stack u32[16] block, inline int r i a b c d) -> stack u32[16], stack u32[16]
+{
+  reg u32 aa bb cc dd block_1 block_2;
+  reg u64 block_index_1 block_index_2;
+
+  block_index_1 = (64u)BLAKE2S_SIGMA[r * 16 + 2 * i];
+  block_index_2 = (64u)BLAKE2S_SIGMA[r * 16 + 2 * i + 1];
+
+  block_1 = block[(int)block_index_1];
+  block_2 = block[(int)block_index_2];
+
+  aa = round_state[a];
+  bb = round_state[b];
+  cc = round_state[c];
+  dd = round_state[d];
+
+  aa += bb;
+  aa += block_1;
+
+  dd ^= aa;
+  _, _, dd = #ROR_32(dd, 16);
+
+  cc += dd;
+
+  bb ^= cc;
+  _, _, bb = #ROR_32(bb, 12);
+
+  aa += bb;
+  aa += block_2;
+
+  dd ^= aa;
+  _, _, dd = #ROR_32(dd, 8);
+
+  cc += dd;
+
+  bb ^= cc;
+  _, _, bb = #ROR_32(bb, 7);
+
+  round_state[a] = aa;
+  round_state[b] = bb;
+  round_state[c] = cc;
+  round_state[d] = dd;
+
+  return round_state, block;
+}
+
+inline fn __compress(stack u64 s_byte_counter, stack u32[16] block, stack u32[8] h, inline bool last_block) -> stack u32[8]
+{
+  stack u32[16] round_state;
+  reg u64 byte_counter;
+  byte_counter = s_byte_counter;
+
+  inline int i;
+  for i = 0 to 8 {
+    round_state[i] = h[i];
+  }
+
+  for i = 0 to 4 {
+    round_state[8 + i] = BLAKE2S_IV[i];
+  }
+
+  reg u64 byte_counter_spill;
+  byte_counter_spill = byte_counter;
+
+  reg u64 xor;
+  xor = byte_counter & 0xff;
+  round_state[12] = BLAKE2S_IV[4];
+  round_state[12] ^= xor;
+
+  xor = byte_counter_spill >> 32; 
+  round_state[13] = BLAKE2S_IV[5];
+  round_state[13] ^= xor;
+
+  round_state[14] = BLAKE2S_IV[6];
+  round_state[15] = BLAKE2S_IV[7];
+
+  if (last_block) {
+    round_state[14] ^= 0xffffffff;
+  }
+
+  inline int r;
+  for r = 0 to 10 {
+    round_state, block = __G(round_state, block, r, 0, 0, 4, 8 , 12);
+    round_state, block = __G(round_state, block, r, 1, 1, 5, 9 , 13);
+    round_state, block = __G(round_state, block, r, 2, 2, 6, 10, 14);
+    round_state, block = __G(round_state, block, r, 3, 3, 7, 11, 15);
+    round_state, block = __G(round_state, block, r, 4, 0, 5, 10, 15);
+    round_state, block = __G(round_state, block, r, 5, 1, 6, 11, 12);
+    round_state, block = __G(round_state, block, r, 6, 2, 7, 8 , 13);
+    round_state, block = __G(round_state, block, r, 7, 3, 4, 9 , 14);
+  }
+
+  for i = 0 to 8 {
+    reg u32 xor;
+
+    xor = round_state[i];
+    h[i] ^= xor;
+
+    xor = round_state[i + 8];
+    h[i] ^= xor;
+  }
+
+  return h;
+}
+
+inline fn __hash(reg u64 in inlen, stack u32[8] h) -> stack u32[8] {
+  reg u64 i, num_blocks, inlen_spill;
+  stack u64 byte_counter;
+
+  inlen_spill = inlen;
+  num_blocks = inlen >> 6;
+  byte_counter = 0;
+  i = 0;
+
+  while (i < num_blocks)
+  {
+    stack u32[16] block;
+    inline int j;
+
+    for j = 0 to 16 {
+      reg u64 in_offset;
+      in_offset = in;
+      in_offset += byte_counter;
+      block[j] = (u32)[in_offset + j * 4];
+    }
+
+    byte_counter += 64;
+
+    if (byte_counter != inlen_spill) {
+      h = __compress(byte_counter, block, h, false);
+    } else {
+      byte_counter -= 64;
+    }
+
+    i += 1;
+  }
+
+  stack u32[16] block;
+  inline int j;
+  for j = 0 to 16 {
+    block[j] = 0;
+  }
+
+  reg u64 remaining, in_offset;
+  
+  inlen = inlen_spill;
+  remaining = inlen_spill - byte_counter;
+  in_offset = in + byte_counter;
+
+  reg ptr u8[64] block_u8;
+  block_u8 = block; 
+
+  i = 0;
+  while (i < remaining) {
+    block_u8[(int)i] = (u8)[in_offset + i];
+    i += 1;
+  }
+
+  h = __compress(inlen, block_u8, h, true);
+
+  return h;
+}
+
+inline fn __blake2s_ref(reg u64 out in inlen)
+{
+  reg u32 first_parameter_block;
+  first_parameter_block = 0x01010020;
+ 
+  stack u32[8] h;
+  h = #copy_32(BLAKE2S_IV);
+
+  h[0] = h[0] ^ first_parameter_block;
+
+  h = __hash(in, inlen, h);
+
+  inline int i;
+  for i = 0 to 8 {
+    (u32)[out + i * 4] = h[i];
+  }
+}
