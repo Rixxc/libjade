@@ -1,0 +1,33 @@
+name: amd64-linux-main
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/nix
+  pull_request:
+
+jobs:
+
+  compile:
+    runs-on: [self-hosted, linux, X64, amd64-deploy-nix]
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: compile
+        run: nix-shell --command "make -j$JOBS -C src/ CI=1 default"
+
+      - name: print logs
+        run: nix-shell --command "make -C src/ CI=1 reporter"
+
+      - name: return error if there are any errors
+        run: nix-shell --command "make -C src/ CI=1 err"
+
+      - name: libjade-logs-src.tar.gz - contains non-empty logs and errors
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: libjade-logs-src.tar.gz
+          path: src/libjade-logs-src.tar.gz
+
