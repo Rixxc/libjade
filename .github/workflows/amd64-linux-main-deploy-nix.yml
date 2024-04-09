@@ -15,14 +15,17 @@ jobs:
       - name: checkout
         uses: actions/checkout@v4
 
+      - name: enter nix shell
+        uses: nix develop
+
       - name: compile
-        run: nix-shell --command "make -j$JOBS -C src/ CI=1 default"
+        run: make -j$JOBS -C src/ CI=1 default
 
       - name: print logs
-        run: nix-shell --command "make -C src/ CI=1 reporter"
+        run: make -C src/ CI=1 reporter
 
       - name: return error if there are any errors
-        run: nix-shell --command "make -C src/ CI=1 err"
+        run: make -C src/ CI=1 err
 
       - name: libjade-logs-src.tar.gz - contains non-empty logs and errors
         if: always()
