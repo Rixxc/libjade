@@ -15,8 +15,12 @@ jobs:
       - name: checkout
         uses: actions/checkout@v4
 
+      - uses: DeterminateSystems/nix-installer-action@v10
+      - uses: DeterminateSystems/magic-nix-cache-action@v4
+      - uses: DeterminateSystems/flake-checker-action@v4
+
       - name: enter nix shell
-        run: nix --experimental-features 'nix-command flakes' develop
+        run: nix develop
 
       - name: compile
         run: make -j$JOBS -C src/ CI=1 default

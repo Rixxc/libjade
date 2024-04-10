@@ -8,14 +8,14 @@
       url = "github:jasmin-lang/jasmin?rev=e84c0c59b4f4e005f2be4de5fdfbcaf1e3e2f975";
       flake = false;
     };
-
   };
 
-  outputs = { self, nixpkgs, easycrypt, jasmin, ... }:
+  outputs = { nixpkgs, easycrypt, jasmin, ... }:
     let
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
       jasminc = pkgs.callPackage "${jasmin}/default.nix" { inherit pkgs; };
+      ec = easycrypt.packages.${system}.default;
     in
     {
       packages.${system}.default = pkgs.stdenv.mkDerivation {
@@ -24,6 +24,7 @@
 
         nativeBuildInputs = with pkgs; [
           jasminc
+          ec
           gcc
           gnumake
         ];
@@ -39,26 +40,6 @@
           cp libjade.h $out/include/
         '';
 
-      };
-
-
-      checks.${system} = {
-        reporter = pkgs.stdenv.mkDerivation {
-          name = "Reporter";
-          src = ./src;
-
-          nativeBuildInputs = with pkgs; [
-            jasminc
-            gnumake
-          ];
-
-
-          buildPhase = ''
-            make CI=1 -j$(nproc) default
-            make CI=1 reporter
-            make CI=1 err
-          '';
-        };
       };
     };
 }
