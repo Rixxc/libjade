@@ -1,0 +1,1312 @@
+inline fn __write_12(reg u64[4] in) -> stack u64[12]
+{
+	reg u64 in_aux temp;
+	stack u64[12] out;
+	
+	in_aux = in[0];
+	temp = in_aux & 2097151;
+	out[0] = temp;
+	
+	in_aux = in[0];
+	temp = in_aux >> 21;
+	temp = temp & 2097151;
+	out[1] = temp;
+	
+	in_aux = in[0];
+	temp = in_aux >> 42;
+	temp = temp & 2097151;
+	out[2] = temp;
+	
+	temp = in[0] >> 63;
+	in_aux = in[1];
+	in_aux = in_aux << 1;
+	in_aux = in_aux;
+	temp = temp | in_aux;
+	temp = temp & 2097151;
+	out[3] = temp;
+	
+	in_aux = in[1];
+	temp = in_aux >> 20;
+	temp = temp & 2097151;
+	out[4] = temp;
+	
+	in_aux = in[1];
+	temp = in_aux >> 41;
+	temp = temp & 2097151;
+	out[5] = temp;
+	
+	temp = in[1] >> 62;
+	in_aux = in[2];
+	in_aux = in_aux << 2;
+	in_aux = in_aux;
+	temp = temp | in_aux;
+	temp = temp & 2097151;
+	out[6] = temp;
+	
+	in_aux = in[2];
+	temp = in_aux >> 19;
+	temp = temp & 2097151;
+	out[7] = temp;
+	
+	in_aux = in[2];
+	temp = in_aux >> 40;
+	temp = temp & 2097151;
+	out[8] = temp;
+	
+	temp = in[2] >> 61;
+	in_aux = in[3];
+	in_aux = in_aux << 3;
+	in_aux = in_aux;
+	temp = temp | in_aux;
+	temp = temp & 2097151;
+	out[9] = temp;
+	
+	in_aux = in[3];
+	temp = in_aux >> 18;
+	temp = temp & 2097151;
+	out[10] = temp;
+	
+	in_aux = in[3];
+	temp = in_aux >> 39;
+	out[11] = temp;
+	
+	return out;
+}
+
+inline fn __muladd_q4(reg u64[4] a b c) -> reg u64[4]
+{
+	stack u64[12] a_s b_s c_s;
+	reg u64[7] a_r b_r;
+	stack u64[24] s_S;
+	reg u64[14] s;
+	reg u64[4] res;
+	reg u64 temp temp2 add_temp _2x20 carry s_aux;
+	inline int i;
+	
+	a_s = __write_12(a);
+	b_s = __write_12(b);
+	c_s = __write_12(c);
+	
+	for i=0 to 6{
+		a_r[i] = a_s[i];
+		b_r[i] = b_s[i];
+	}
+	
+	// s0 = c0 + a0 * b0;
+	temp = a_r[0];
+	temp *= b_r[0];
+	temp2 = c_s[0];
+	temp += temp2;
+	s_S[0] = temp; 
+	
+  // s1 = c1 + a0 * b1 + a1 * b0;
+  temp = a_r[0];
+	temp *= b_r[1];
+	temp2 = a_r[1];
+	temp2 *= b_r[0];
+	temp += temp2;
+	temp2 = c_s[1];
+	temp += temp2;
+	s_S[1] = temp;
+	
+  // s2 = c2 + a0 * b2 + a1 * b1 + a2 * b0;
+  temp = a_r[0];
+  temp *= b_r[2];
+	temp2 = a_r[1];
+	temp2 *= b_r[1];
+	temp += temp2;
+	temp2 = a_r[2];
+	temp2 *= b_r[0];
+	temp += temp2;
+  temp2 = c_s[2];
+	temp += temp2;
+	s_S[2] = temp;
+	
+	// s3 = c3 + a0 * b3 + a1 * b2 + a2 * b1 + a3 * b0;
+	temp = a_r[0];
+  temp *= b_r[3];
+  for i=1 to 4
+  {
+  	temp2 = a_r[i];
+		temp2 *= b_r[3-i];
+		temp += temp2;
+  }
+  temp2 = c_s[3];
+	temp += temp2;
+	s_S[3] = temp;
+	
+	// s4 = c4 + a0 * b4 + a1 * b3 + a2 * b2 + a3 * b1 + a4 * b0;
+	temp = a_r[0];
+  temp *= b_r[4];
+  for i=1 to 5
+  {
+  	temp2 = a_r[i];
+		temp2 *= b_r[4-i];
+		temp += temp2;
+  }
+  temp2 = c_s[4];
+	temp += temp2;
+	s_S[4] = temp;
+	
+	// s5 = c5 + a0 * b5 + a1 * b4 + a2 * b3 + a3 * b2 + a4 * b1 + a5 * b0;
+	temp = a_r[0];
+  temp *= b_r[5];
+  for i=1 to 6
+  {
+  	temp2 = a_r[i];
+		temp2 *= b_r[5-i];
+		temp += temp2;
+  }
+  temp2 = c_s[5];
+	temp += temp2;
+	s_S[5] = temp;
+	
+	// s6 = c6 + a0 * b6 + a1 * b5 + a2 * b4 + a3 * b3 + a4 * b2 + a5 * b1 + a6 * b0;
+	temp = b_s[6];
+  temp *= a_r[0];
+  for i=1 to 6
+  {
+  	temp2 = a_r[i];
+		temp2 *= b_r[6-i];
+		temp += temp2;
+  }
+  temp2 = a_s[6];
+  temp2 *= b_r[0];
+  temp += temp2;
+  
+  temp2 = c_s[6];
+	temp += temp2;
+	s_S[6] = temp;
+  
+  // s7 = c7 + a0 * b7 + a1 * b6 + a2 * b5 + a3 * b4 + a4 * b3 + a5 * b2 + a6 * b1 + a7 * b0;
+	temp = b_s[7];
+	temp *= a_r[0];
+	
+	temp2 = b_s[6];
+  temp2 *= a_r[1];
+  temp += temp2;
+  
+	for i=2 to 6
+  {
+  	temp2 = a_r[i];
+		temp2 *= b_r[7-i];
+		temp += temp2;
+  }
+  temp2 = a_s[6];
+  temp2 *= b_r[1];
+  temp += temp2;
+  
+  temp2 = a_s[7];
+  temp2 *= b_r[0];
+  temp += temp2;
+  
+  temp2 = c_s[7];
+	temp += temp2;
+	s_S[7] = temp;
+  
+  // s8 = c8 + a0 * b8 + a1 * b7 + a2 * b6 + a3 * b5 + a4 * b4 + a5 * b3 + a6 * b2 + a7 * b1 + a8 * b0;
+  temp = b_s[8];
+	temp *= a_r[0];
+	
+	temp2 = b_s[7];
+	temp2 *= a_r[1];
+	temp += temp2;
+	
+	temp2 = b_s[6];
+	temp2 *= a_r[2];
+	temp += temp2;
+	
+	for i=3 to 6
+  {
+  	temp2 = a_r[i];
+		temp2 *= b_r[8-i];
+		temp += temp2;
+  }
+  temp2 = a_s[6];
+  temp2 *= b_r[2];
+  temp += temp2;
+  
+  temp2 = a_s[7];
+  temp2 *= b_r[1];
+  temp += temp2;
+  
+  temp2 = a_s[8];
+  temp2 *= b_r[0];
+  temp += temp2;
+  
+  temp2 = c_s[8];
+	temp += temp2;
+	s_S[8] = temp;
+  
+  // s9 = c9 + a0 * b9 + a1 * b8 + a2 * b7 + a3 * b6 + a4 * b5 + a5 * b4 + a6 * b3 + a7 * b2 + a8 * b1 + a9 * b0;
+  temp = b_s[9];
+	temp *= a_r[0];
+	
+	temp2 = b_s[8];
+	temp2 *= a_r[1];
+	temp += temp2;
+	
+	temp2 = b_s[7];
+	temp2 *= a_r[2];
+	temp += temp2;
+	
+	temp2 = b_s[6];
+	temp2 *= a_r[3];
+	temp += temp2;
+	
+	for i=4 to 6
+  {
+  	temp2 = a_r[i];
+		temp2 *= b_r[9-i];
+		temp += temp2;
+  }
+  
+  temp2 = a_s[6];
+  temp2 *= b_r[3];
+  temp += temp2;
+  
+  temp2 = a_s[7];
+  temp2 *= b_r[2];
+  temp += temp2;
+  
+  temp2 = a_s[8];
+  temp2 *= b_r[1];
+  temp += temp2;
+  
+  temp2 = a_s[9];
+  temp2 *= b_r[0];
+  temp += temp2;
+  
+  temp2 = c_s[9];
+	temp += temp2;
+	s_S[9] = temp;
+  
+  // s10 = c10 + a0 * b10 + a1 * b9 + a2 * b8 + a3 * b7 + a4 * b6 + a5 * b5 + a6 * b4 + a7 * b3 + a8 * b2 + a9 * b1 + a10 * b0;
+  temp = b_s[10];
+	temp *= a_r[0];
+	
+	temp2 = b_s[9];
+	temp2 *= a_r[1];
+	temp += temp2;
+	
+	temp2 = b_s[8];
+	temp2 *= a_r[2];
+	temp += temp2;
+	
+	temp2 = b_s[7];
+	temp2 *= a_r[3];
+	temp += temp2;
+	
+	temp2 = b_s[6];
+	temp2 *= a_r[4];
+	temp += temp2;
+
+	temp2 = b_r[5];
+	temp2 *= a_r[5];
+	temp += temp2;
+	
+  temp2 = b_r[4];
+  temp2 *= a_s[6];
+  temp += temp2;
+  
+  temp2 = a_s[7];
+  temp2 *= b_r[3];
+  temp += temp2;
+  
+  temp2 = a_s[8];
+  temp2 *= b_r[2];
+  temp += temp2;
+  
+  temp2 = a_s[9];
+  temp2 *= b_r[1];
+  temp += temp2;
+  
+  temp2 = a_s[10];
+  temp2 *= b_r[0];
+  temp += temp2;
+  
+  temp2 = c_s[10];
+	temp += temp2;
+	s_S[10] = temp;
+	
+  // s11 = c11 + a0 * b11 + a1 * b10 + a2 * b9 + a3 * b8 + a4 * b7 + a5 * b6 + a6 * b5 + a7 * b4 + a8 * b3 + a9 * b2 + a10 * b1 + a11 * b0;
+  temp = b_s[11];
+	temp *= a_r[0];
+	
+	temp2 = b_s[10];
+	temp2 *= a_r[1];
+	temp += temp2;
+	
+	temp2 = b_s[9];
+	temp2 *= a_r[2];
+	temp += temp2;
+	
+	temp2 = b_s[8];
+	temp2 *= a_r[3];
+	temp += temp2;
+	
+	temp2 = b_s[7];
+	temp2 *= a_r[4];
+	temp += temp2;
+	
+	temp2 = b_s[6];
+	temp2 *= a_r[5];
+	temp += temp2;
+	
+	temp2 = a_s[6];
+	temp2 *= b_r[5];
+	temp += temp2;
+	
+  temp2 = a_s[7];
+  temp2 *= b_r[4];
+  temp += temp2;
+  
+  temp2 = a_s[8];
+  temp2 *= b_r[3];
+  temp += temp2;
+  
+  temp2 = a_s[9];
+  temp2 *= b_r[2];
+  temp += temp2;
+  
+  temp2 = a_s[10];
+  temp2 *= b_r[1];
+  temp += temp2;
+  
+  temp2 = a_s[11];
+  temp2 *= b_r[0];
+  temp += temp2;
+  
+  temp2 = c_s[11];
+	temp += temp2;
+	
+	s_S[11] = temp;
+	
+	for i=0 to 6{
+		b_r[i] = b_s[6 + i];
+	}
+	
+  // s12 = a1 * b11 + a2 * b10 + a3 * b9 + a4 * b8 + a5 * b7 + a6 * b6 + a7 * b5 + a8 * b4 + a9 * b3 + a10 * b2 + a11 * b1;
+  temp = a_r[1];
+	temp *= b_r[5];
+	for i=2 to 6
+	{
+  	temp2 = a_r[i];
+		temp2 *= b_r[6-i];
+		temp += temp2;
+  }
+  for i=0 to 6{
+		a_r[i] = a_s[6 + i];
+	}
+	
+	temp2 = a_r[0];
+	temp2 *= b_r[0];
+	temp += temp2;
+	
+	temp2 = b_s[5];
+	temp2 *= a_r[1];
+	temp += temp2;
+  
+  temp2 = b_s[4];
+  temp2 *= a_r[2];
+  temp += temp2;
+  
+  temp2 = b_s[3];
+  temp2 *= a_r[3];
+  temp += temp2;
+  
+  temp2 = b_s[2];
+  temp2 *= a_r[4];
+  temp += temp2;
+  
+  temp2 = b_s[1];
+  temp2 *= a_r[5];
+  temp += temp2;
+  
+  s_S[12] = temp;
+
+  // s13 = a2 * b11 + a3 * b10 + a4 * b9 + a5 * b8 + a6 * b7 + a7 * b6 + a8 * b5 + a9 * b4 + a10 * b3 + a11 * b2;
+  temp = a_s[2];
+	temp *= b_r[5];
+	
+	temp2 = a_s[3];
+  temp2 *= b_r[4];
+  temp += temp2;
+  
+  temp2 = a_s[4];
+  temp2 *= b_r[3];
+  temp += temp2;
+  
+  temp2 = a_s[5];
+  temp2 *= b_r[2];
+  temp += temp2;
+  
+  temp2 = a_r[0];
+  temp2 *= b_r[1];
+  temp += temp2;
+  
+  temp2 = a_r[1];
+  temp2 *= b_r[0];
+  temp += temp2;
+
+  temp2 = b_s[5];
+  temp2 *= a_r[2];
+  temp += temp2;
+  
+  temp2 = b_s[4];
+  temp2 *= a_r[3];
+  temp += temp2;
+  
+  temp2 = b_s[3];
+  temp2 *= a_r[4];
+  temp += temp2;
+  
+  temp2 = b_s[2];
+  temp2 *= a_r[5];
+  temp += temp2;
+  
+  s_S[13] = temp;
+  
+  // s14 = a3 * b11 + a4 * b10 + a5 * b9 + a6 * b8 + a7 * b7 + a8 * b6 + a9 * b5 + a10 * b4 + a11 * b3;
+  temp = a_s[3];
+	temp *= b_r[5];
+	
+	temp2 = a_s[4];
+  temp2 *= b_r[4];
+  temp += temp2;
+  
+  temp2 = a_s[5];
+  temp2 *= b_r[3];
+  temp += temp2;
+  
+	for i=0 to 3{
+		temp2 = a_r[i];
+		temp2 *= b_r[2-i];
+		temp += temp2;
+	}
+
+  temp2 = b_s[5];
+  temp2 *= a_r[3];
+  temp += temp2;
+  
+  temp2 = b_s[4];
+  temp2 *= a_r[4];
+  temp += temp2;
+  
+  temp2 = b_s[3];
+  temp2 *= a_r[5];
+  temp += temp2;
+  
+  s_S[14] = temp;
+  
+  // s15 = a4 * b11 + a5 * b10 + a6 * b9 + a7 * b8 + a8 * b7 + a9 * b6 + a10 * b5 + a11 * b4;
+  temp = a_s[4];
+	temp *= b_r[5];
+  
+  temp2 = a_s[5];
+  temp2 *= b_r[4];
+  temp += temp2;
+  
+	for i=0 to 4{
+		temp2 = a_r[i];
+		temp2 *= b_r[3-i];
+		temp += temp2;
+	}
+
+  temp2 = b_s[5];
+  temp2 *= a_r[4];
+  temp += temp2;
+  
+  temp2 = b_s[4];
+  temp2 *= a_r[5];
+  temp += temp2;
+  
+  s_S[15] = temp;
+  
+  // s16 = a5 * b11 + a6 * b10 + a7 * b9 + a8 * b8 + a9 * b7 + a10 * b6 + a11 * b5;
+  temp = a_s[5];
+	temp *= b_r[5];
+  
+	for i=0 to 5{
+		temp2 = a_r[i];
+		temp2 *= b_r[4-i];
+		temp += temp2;
+	}
+  
+  temp2 = b_s[5];
+  temp2 *= a_r[5];
+  temp += temp2;
+  
+  s_S[16] = temp;
+  
+  // s17 = a6 * b11 + a7 * b10 + a8 * b9 + a9 * b8 + a10 * b7 + a11 * b6;
+  temp = a_r[0];
+	temp *= b_r[5];
+  
+	for i=1 to 6{
+		temp2 = a_r[i];
+		temp2 *= b_r[5-i];
+		temp += temp2;
+	}
+  
+  s_S[17] = temp;
+  
+  // s18 = a7 * b11 + a8 * b10 + a9 * b9 + a10 * b8 + a11 * b7;
+  temp = a_r[1];
+	temp *= b_r[5];
+  
+	for i=2 to 6{
+		temp2 = a_r[i];
+		temp2 *= b_r[6-i];
+		temp += temp2;
+	}
+  
+  s_S[18] = temp;
+  
+  // s19 = a8 * b11 + a9 * b10 + a10 * b9 + a11 * b8;
+  temp = a_r[2];
+	temp *= b_r[5];
+  
+	for i=3 to 6{
+		temp2 = a_r[i];
+		temp2 *= b_r[7-i];
+		temp += temp2;
+	}
+  
+  s_S[19] = temp;
+  
+  // s20 = a9 * b11 + a10 * b10 + a11 * b9;
+  temp = a_r[3];
+	temp *= b_r[5];
+	
+	temp2 = a_r[4];
+	temp2 *= b_r[4];
+	temp += temp2;
+	
+	temp2 = a_r[5];
+	temp2 *= b_r[3];
+	
+	temp += temp2;
+  
+  s_S[20] = temp;
+  
+  // s21 = a10 * b11 + a11 * b10;
+  temp = a_r[4];
+	temp *= b_r[5];
+	temp2 = a_r[5];
+	temp2 *= b_r[4];
+	temp += temp2;
+  
+  s_S[21] = temp;
+  
+  // s22 = a11 * b11;
+  temp = a_r[5];
+	temp *= b_r[5];
+  
+  s_S[22] = temp;
+  
+  s_S[23] = 0;
+	
+	for i = 0 to 12{
+		s[i] = s_S[i];
+	}
+	
+	_2x20 = 1<<20;
+	for i = 0 to 6 {
+		carry = s[2*i];
+		carry += _2x20;
+		carry = carry >>s 21;
+	
+		s[2 * i + 1] += carry;
+		
+		carry = carry << 21;
+		s[2*i] -= carry;
+	}
+	
+	for i = 0 to 12{
+		s_S[i] = s[i];
+	}
+	
+	for i = 12 to 24{
+		s[i - 12] = s_S[i];
+	}
+	
+	for i = 0 to 6 {
+		carry = s[2*i];
+		carry += _2x20;
+		carry = carry >>s 21;
+	
+		s[2 * i + 1] += carry;
+		
+		carry = carry << 21;
+		s[2*i] -= carry;
+	}
+	
+	for i = 12 to 24{
+		s_S[i] = s[i - 12];
+	}
+	
+	for i = 1 to 13{
+		s[i - 1] = s_S[i];
+	}
+	
+	for i = 0 to 6 {
+		carry = s[2*i];
+		carry += _2x20;
+		carry = carry >>s 21;
+	
+		s[2 * i + 1] += carry;
+		
+		carry = carry << 21;
+		s[2*i] -= carry;
+	}
+	
+	for i = 1 to 13{
+		s_S[i] = s[i - 1];
+	}
+	
+	for i = 13 to 23{
+		s[i - 13] = s_S[i];
+	}
+	
+	for i = 0 to 5 {
+		carry = s[2*i];
+		carry += _2x20;
+		carry = carry >>s 21;
+	
+		s[2 * i + 1] += carry;
+		
+		carry = carry << 21;
+		s[2*i] -= carry;
+	}
+	
+	for i = 13 to 23{
+		s_S[i] = s[i - 13];
+	}
+	
+	for i = 0 to 8 {
+		s[i] = s_S[i + 7];
+	}
+	
+	temp = s_S[23];
+	temp2 = temp * 666643;
+	s[4] += temp2;
+	
+	temp2 = temp * 470296;
+	s[5] += temp2;
+	
+	temp2 = temp * 654183;
+	s[6] += temp2;
+	
+	temp2 = temp * 997805;
+	s[7] -= temp2;
+	
+	temp2 = temp * 136657;
+	add_temp = s_S[15];
+	add_temp = add_temp + temp2;
+	s_S[15] = add_temp;
+	
+	temp2 = temp * 683901;
+	add_temp = s_S[16];
+	add_temp = add_temp - temp2;
+	s_S[16] = add_temp;
+	
+	s_S[23] = 0;
+	
+	temp = s_S[22];
+	temp2 = temp * 666643;
+	s[3] += temp2;
+	
+	temp2 = temp * 470296;
+	s[4] += temp2;
+	
+	temp2 = temp * 654183;
+	s[5] += temp2;
+	
+	temp2 = temp * 997805;
+	s[6] -= temp2;
+	
+	temp2 = temp * 136657;
+	s[7] += temp2;
+	
+	temp2 = temp * 683901;
+	add_temp = s_S[15];
+	add_temp = add_temp - temp2;
+	s_S[15] = add_temp;
+	
+	s_S[22] = 0;
+	
+	temp = s_S[21];
+	temp2 = temp * 666643;
+	s[2] += temp2;
+	
+	temp2 = temp * 470296;
+	s[3] += temp2;
+	
+	temp2 = temp * 654183;
+	s[4] += temp2;
+	
+	temp2 = temp * 997805;
+	s[5] -= temp2;
+	
+	temp2 = temp * 136657;
+	s[6] += temp2;
+	
+	temp2 = temp * 683901;
+	s[7] -= temp2;
+	
+	s_S[21] = 0;
+	
+	temp = s_S[20];
+	temp2 = temp * 666643;
+	s[1] += temp2;
+	
+	temp2 = temp * 470296;
+	s[2] += temp2;
+	
+	temp2 = temp * 654183;
+	s[3] += temp2;
+	
+	temp2 = temp * 997805;
+	s[4] -= temp2;
+	
+	temp2 = temp * 136657;
+	s[5] += temp2;
+	
+	temp2 = temp * 683901;
+	s[6] -= temp2;
+	
+	s_S[20] = 0;
+	
+	temp = s_S[19];
+	temp2 = temp * 666643;
+	s[0] += temp2;
+	
+	temp2 = temp * 470296;
+	s[1] += temp2;
+	
+	temp2 = temp * 654183;
+	s[2] += temp2;
+	
+	temp2 = temp * 997805;
+	s[3] -= temp2;
+	
+	temp2 = temp * 136657;
+	s[4] += temp2;
+	
+	temp2 = temp * 683901;
+	s[5] -= temp2;
+	
+	s_S[19] = 0;
+	
+	temp = s_S[18];
+	temp2 = temp * 666643;
+	add_temp = s_S[6];
+	add_temp = add_temp + temp2;
+	s_S[6] = add_temp;
+	
+	temp2 = temp * 470296;
+	s[0] += temp2;
+	
+	temp2 = temp * 654183;
+	s[1] += temp2;
+	
+	temp2 = temp * 997805;
+	s[2] -= temp2;
+	
+	temp2 = temp * 136657;
+	s[3] += temp2;
+	
+	temp2 = temp * 683901;
+	s[4] -= temp2;
+	
+	s_S[18] = 0;
+	
+	
+	for i = 0 to 8 {
+		s_S[i + 7] = s[i];
+	}
+	
+	_2x20 = 1<<20;
+	
+	for i = 0 to 8 {
+		s[i] = s_S[i + 8];
+	}
+	
+	carry = s_S[6];
+	carry += _2x20;
+	carry = carry >>s 21;
+	
+	temp = s_S[7];
+	temp += carry;
+	s_S[7] = temp;
+	
+	temp = s_S[6];
+	carry = carry << 21;
+	temp -= carry;
+	s_S[6] = temp;
+	
+	for i = 0 to 4 {
+		carry = s[2*i];
+		carry = carry + _2x20;
+		carry = carry >>s 21;
+		
+		s[2 * i + 1] += carry;
+		
+		carry = carry << 21;
+		s[2*i] -= carry;
+	}
+	
+	carry = s_S[16];
+	carry += _2x20;
+	carry = carry >>s 21;
+	
+	temp = s_S[17];
+	temp += carry;
+	s_S[17] = temp;
+	
+	temp = s_S[16];
+	carry = carry << 21;
+	temp -= carry;
+	s_S[16] = temp;
+	
+	carry = s_S[7];
+	carry += _2x20;
+	carry = carry >>s 21;
+	
+	s[0] += carry;
+	
+	temp = s_S[7];
+	carry = carry << 21;
+	temp -= carry;
+	s_S[7] = temp;
+	
+	for i = 0 to 3 {
+		carry = s[2*i + 1];
+		carry += _2x20;
+		carry = carry >>s 21;
+	
+		s[2 * i + 2] += carry;
+		
+		carry = carry << 21;
+		s[2*i + 1] -= carry;
+	}
+	
+	carry = s[7];
+	carry += _2x20;
+	carry = carry >>s 21;
+	
+	temp = s_S[16];
+	temp += carry;
+	s_S[16] = temp;
+	carry = carry << 21;
+	s[7] -= carry;
+	
+	for i = 0 to 8 {
+		s_S[i + 8] = s[i];
+	}
+	
+	for i = 0 to 8 {
+		s[i] = s_S[i + 1];
+	}
+	
+	temp = s_S[17];
+	temp2 = temp * 666643;
+	s[4] += temp2;
+	
+	temp2 = temp * 470296;
+	s[5] += temp2;
+	
+	temp2 = temp * 654183;
+	s[6] += temp2;
+	
+	temp2 = temp * 997805;
+	s[7] -= temp2;
+	
+	temp2 = temp * 136657;
+	add_temp = s_S[9];
+	add_temp = add_temp + temp2;
+	s_S[9] = add_temp;
+	
+	temp2 = temp * 683901;
+	add_temp = s_S[10];
+	add_temp = add_temp - temp2;
+	s_S[10] = add_temp;
+	
+	s_S[17] = 0;
+	
+	temp = s_S[16];
+	temp2 = temp * 666643;
+	s[3] += temp2;
+	
+	temp2 = temp * 470296;
+	s[4] += temp2;
+	
+	temp2 = temp * 654183;
+	s[5] += temp2;
+	
+	temp2 = temp * 997805;
+	s[6] -= temp2;
+	
+	temp2 = temp * 136657;
+	s[7] += temp2;
+	
+	temp2 = temp * 683901;
+	add_temp = s_S[9];
+	add_temp = add_temp - temp2;
+	s_S[9] = add_temp;
+	
+	s_S[16] = 0;
+	
+	temp = s_S[15];
+	temp2 = temp * 666643;
+	s[2] += temp2;
+	
+	temp2 = temp * 470296;
+	s[3] += temp2;
+	
+	temp2 = temp * 654183;
+	s[4] += temp2;
+	
+	temp2 = temp * 997805;
+	s[5] -= temp2;
+	
+	temp2 = temp * 136657;
+	s[6] += temp2;
+	
+	temp2 = temp * 683901;
+	s[7] -= temp2;
+	
+	s_S[15] = 0;
+	
+	temp = s_S[14];
+	temp2 = temp * 666643;
+	s[1] += temp2;
+	
+	temp2 = temp * 470296;
+	s[2] += temp2;
+	
+	temp2 = temp * 654183;
+	s[3] += temp2;
+	
+	temp2 = temp * 997805;
+	s[4] -= temp2;
+	
+	temp2 = temp * 136657;
+	s[5] += temp2;
+	
+	temp2 = temp * 683901;
+	s[6] -= temp2;
+	
+	s_S[14] = 0;
+	
+	temp = s_S[13];
+	temp2 = temp * 666643;
+	s[0] += temp2;
+	
+	temp2 = temp * 470296;
+	s[1] += temp2;
+	
+	temp2 = temp * 654183;
+	s[2] += temp2;
+	
+	temp2 = temp * 997805;
+	s[3] -= temp2;
+	
+	temp2 = temp * 136657;
+	s[4] += temp2;
+	
+	temp2 = temp * 683901;
+	s[5] -= temp2;
+	
+	s_S[13] = 0;
+	
+	temp = s_S[12];
+	temp2 = temp * 666643;
+	add_temp = s_S[0];
+	add_temp = add_temp + temp2;
+	s_S[0] = add_temp;
+	
+	temp2 = temp * 470296;
+	s[0] += temp2;
+	
+	temp2 = temp * 654183;
+	s[1] += temp2;
+	
+	temp2 = temp * 997805;
+	s[2] -= temp2;
+	
+	temp2 = temp * 136657;
+	s[3] += temp2;
+	
+	temp2 = temp * 683901;
+	s[4] -= temp2;
+	
+	s_S[12] = 0;
+	
+	for i = 0 to 8 {
+		s_S[i + 1] = s[i];
+	}
+	
+	_2x20 = 1<<20;
+	
+	for i = 0 to 8 {
+		s[i] = s_S[i + 2];
+	}
+	
+	carry = s_S[0];
+	carry += _2x20;
+	carry = carry >>s 21;
+	
+	temp = s_S[1];
+	temp += carry;
+	s_S[1] = temp;
+	
+	temp = s_S[0];
+	carry = carry << 21;
+	temp -= carry;
+	s_S[0] = temp;
+	
+	for i = 0 to 4 {
+		carry = s[2*i];
+		carry += _2x20;
+		carry = carry >>s 21;
+	
+		s[2 * i + 1] += carry;
+		
+		carry = carry << 21;
+		s[2*i] -= carry;
+	}
+	
+	carry = s_S[10];
+	carry += _2x20;
+	carry = carry >>s 21;
+	
+	temp = s_S[11];
+	temp += carry;
+	s_S[11] = temp;
+	
+	temp = s_S[10];
+	carry = carry << 21;
+	temp -= carry;
+	s_S[10] = temp;
+	
+	
+	carry = s_S[1];
+	carry += _2x20;
+	carry = carry >>s 21;
+	
+	s[0] += carry;
+	
+	temp = s_S[1];
+	carry = carry << 21;
+	temp -= carry;
+	s_S[1] = temp;
+	
+	for i = 0 to 3 {
+		carry = s[2*i + 1];
+		carry += _2x20;
+		carry = carry >>s 21;
+	
+		s[2 * i + 2] += carry;
+		
+		carry = carry << 21;
+		s[2*i + 1] -= carry;
+	}
+	
+	carry = s[7];
+	carry += _2x20;
+	carry = carry >>s 21;
+	
+	temp = s_S[10];
+	temp += carry;
+	s_S[10] = temp;
+	
+	carry = carry << 21;
+	s[7] -= carry;
+	
+	carry = s_S[11];
+	carry += _2x20;
+	carry = carry >>s 21;
+	
+	temp = s_S[12];
+	temp += carry;
+	s_S[12] = temp;
+	
+	temp = s_S[11];
+	carry = carry << 21;
+	temp -= carry;
+	s_S[11] = temp;
+	
+	for i = 0 to 8 {
+		s_S[i + 2] = s[i];
+	}
+	
+	for i = 0 to 8 {
+		s[i] = s_S[i];
+	}
+	
+	temp = s_S[12];
+	temp2 = temp * 666643;
+	s[0] += temp2;
+	
+	temp2 = temp * 470296;
+	s[1] += temp2;
+	
+	temp2 = temp * 654183;
+	s[2] += temp2;
+	
+	temp2 = temp * 997805;
+	s[3] -= temp2;
+	
+	temp2 = temp * 136657;
+	s[4] += temp2;
+	
+	temp2 = temp * 683901;
+	s[5] -= temp2;
+	
+	s_S[12] = 0;
+	
+	for i = 0 to 7 {
+		carry = s[i];
+		carry = carry >>s 21;
+	
+		s[i + 1] += carry;
+		
+		carry = carry << 21;
+		s[i] -= carry;
+	}
+	
+	for i = 0 to 8 {
+		s_S[i] = s[i];
+	}
+	
+	for i = 0 to 6 {
+		s[i] = s_S[i + 7];
+	}
+	
+	for i = 0 to 5 {
+		carry = s[i];
+		carry = carry >>s 21;
+	
+		s[i + 1] += carry;
+		
+		carry = carry << 21;
+		s[i] -= carry;
+	}
+	
+	for i = 0 to 6 {
+		s_S[i + 7] = s[i];
+	}
+	
+	for i = 0 to 8 {
+		s[i] = s_S[i];
+	}
+	
+	temp = s_S[12];
+	temp2 = temp * 666643;
+	s[0] += temp2;
+	
+	temp2 = temp * 470296;
+	s[1] += temp2;
+	
+	temp2 = temp * 654183;
+	s[2] += temp2;
+	
+	temp2 = temp * 997805;
+	s[3] -= temp2;
+	
+	temp2 = temp * 136657;
+	s[4] += temp2;
+	
+	temp2 = temp * 683901;
+	s[5] -= temp2;
+	
+	s_S[12] = 0;
+	
+	for i = 0 to 7 {
+		carry = s[i];
+		carry = carry >>s 21;
+	
+		s[i + 1] += carry;
+		
+		carry = carry << 21;
+		s[i] -= carry;
+	}
+	
+	for i = 0 to 8 {
+		s_S[i] = s[i];
+	}
+	
+	for i = 0 to 5 {
+		s[i] = s_S[i + 7];
+	}
+	
+	for i = 0 to 4 {
+		carry = s[i];
+		carry = carry >>s 21;
+	
+		s[i + 1] += carry;
+		
+		carry = carry << 21;
+		s[i] -= carry;
+	}
+	
+	for i = 0 to 5 {
+		s_S[i + 7] = s[i];
+	}
+	
+	res[0] = s_S[0];
+	
+	temp = s_S[1];
+	temp = temp << 21;
+	res[0] = res[0] | temp;
+	
+	temp = s_S[2];
+	temp = temp << 42;
+	res[0] = res[0] | temp;
+	
+	s_aux = s_S[3];
+	temp = s_aux;
+	temp2 = temp << 63;
+	res[0] = res[0] | temp2;
+	res[1] = s_aux >> 1;
+	
+	temp = s_S[4];
+	temp = temp << 20;
+	res[1] = res[1] | temp;
+	
+	temp = s_S[5];
+	temp = temp << 41;
+	res[1] = res[1] | temp;
+	
+	s_aux = s_S[6];
+	temp = s_aux;
+	temp2 = temp << 62;
+	res[1] = res[1] | temp2;
+	res[2] = s_aux >> 2;
+	
+	temp = s_S[7];
+	temp = temp << 19;
+	res[2] = res[2] | temp;
+	
+	temp = s_S[8];
+	temp = temp << 40;
+	res[2] = res[2] | temp;
+	
+	s_aux = s_S[9];
+	temp = s_aux;
+	temp2 = temp << 61;
+	res[2] = res[2] | temp2;
+	res[3] = s_aux >> 3;
+	
+	temp = s_S[10];
+	temp = temp << 18;
+	res[3] = res[3] | temp;
+	
+	temp = s_S[11];
+	temp = temp << 39;
+	res[3] = res[3] | temp;
+	
+	return res;
+}

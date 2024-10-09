@@ -1,0 +1,33 @@
+require "mul4.jinc"
+require "sqr4.jinc"
+require "invert4.jinc"
+
+inline fn __sqr_root4(reg u64[4] f) -> reg u64[4]
+{
+  stack u64[4] t_inv_s fs;
+  reg u32 n_sqrs;
+  
+  fs = #copy(f);
+  t_inv_s = __invert4_ss(fs);
+  f = #copy(fs);
+  
+  n_sqrs = 125;
+  f = __it_sqr4_x2(f, n_sqrs); // pow(t0, 2**(2*125), p) + p
+  f  = __sqr4_rr(f);
+  f = __mul4_rsr(t_inv_s, f);
+  f  = __sqr4_rr(f);
+  
+  return f;
+}
+
+inline fn __sqr_root4_ss(stack u64[4] fs) -> stack u64[4]
+{
+  stack u64[4] hs;
+  reg u64[4] f h;
+
+  f = #copy(fs);
+  h = __sqr_root4(f);
+  hs = #copy(h);
+
+  return hs;
+}

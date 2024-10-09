@@ -1,0 +1,79 @@
+inline fn sc25519_slide(reg u64[4] s, inline int swindowsize) -> stack u8[256]
+{
+	inline int i j m soplen;
+	reg u64[4] sv;
+	reg u64 b k;
+	reg u8 cmp_in add_8;
+	stack u8[256] r;
+	
+	m = (1<<(swindowsize-1))-1;
+	
+	soplen = 256;
+	
+	for i=0 to 64{
+		r[i] 			= s[0];
+		r[i]  		&= 1;
+		r[i+64] 	= s[1];
+		r[i+64] 	&= 1;
+		r[i+128] 	= s[2];
+		r[i+128] 	&= 1;
+		r[i+192] 	= s[3];
+		r[i+192] 	&= 1;
+		
+		s[0] = s[0] >> 1;
+		s[1] = s[1] >> 1;
+		s[2] = s[2] >> 1;
+		s[3] = s[3] >> 1;
+	}
+	
+	for j=0 to soplen{
+		cmp_in = r[j];
+		if(cmp_in != 0){
+			b=1;
+			while(b <= 6){
+				cmp_in = r[(int)(j+b)];
+				_, _, _, _, _, cmp_in = #SHL_8(cmp_in, (8u)b);
+				cmp_in += r[j];
+				if (cmp_in <=s m){
+					r[j] = cmp_in;
+					r[(int)(j+b)] = 0;
+				}
+				else{
+					cmp_in = r[j];
+					add_8 = r[(int)(j+b)];
+					_, _, _, _, _, add_8 = #SHL_8(add_8, (8u)b);
+					cmp_in -= add_8;
+					
+					if (cmp_in >=s -m){
+						r[j] = cmp_in;
+						k = j;
+						k += b;
+						while(k < soplen){
+							cmp_in = r[(int)k];
+							if (cmp_in == 0){
+								r[(int)k] = 1;
+								k = soplen;
+							}
+							else{
+								r[(int)k] = 0;
+							}
+							k += 1;
+						}
+					}
+					else{
+						cmp_in = r[(int)(j+b)];
+						if (cmp_in != 0){
+							b = 7;
+						}
+					}
+				}
+				b += 1;
+				if (b >= (soplen - j)){
+					b = 7;
+				}
+			}
+		}
+	}
+	
+	return r;
+}

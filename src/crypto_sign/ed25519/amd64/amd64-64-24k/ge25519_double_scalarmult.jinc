@@ -1,0 +1,242 @@
+from Jade require "crypto_sign/ed25519/amd64/common/64/add4.jinc"
+from Jade require "crypto_sign/ed25519/amd64/common/64/sub4.jinc"
+from Jade require "crypto_sign/ed25519/amd64/common/64/init_points4.jinc"
+from Jade require "crypto_sign/ed25519/amd64/common/load_ptr4.jinc"
+
+require "ge25519_base_slide_multiples.jinc"
+require "ge25519_nielsadd_p1p1.jinc"
+require "ge25519_pnielsadd_p1p1.jinc"
+require "ge25519_dbl_p1p1.jinc"
+require "ge25519_p1p1_to_p2.jinc"
+require "ge25519_p1p1_to_p3.jinc"
+require "sc25519_slide.jinc"
+require "mul4.jinc"
+
+param int S1_SWINDOWSIZE = 5;
+// PRE1_SIZE = (1<<(S1_SWINDOWSIZE-2))
+param int PRE1_SIZE = 8;
+param int S2_SWINDOWSIZE = 7;
+
+fn ge25519_double_scalarmult_vartime(reg ptr u64[16] r, reg ptr u64[16] p1, reg u64[4] s1, reg u64[4] s2) -> reg u64[16]
+{
+	stack u8[256] slide1 slide2;
+	stack u64[PRE1_SIZE*16] pre1;
+	stack u64[16] neg d1 t;
+	reg ptr u64[12] pre1p_12 rp;
+	reg ptr u64[16] tp d1p pre1p pre2p_16;
+	reg ptr u64[384] pre2p;
+	stack ptr u64[384] pre2ps;
+	stack u64[12] nneg;
+	reg u64[4] d ysubx xaddy t2d ec2d reg_64;
+	reg u64 j k;
+	reg u8 slide_8;
+	stack u64[4] ds s2s xaddys ec2ds;
+	inline int i offs;
+	
+	ec2d[0] = 0xEBD69B9426B2F146;
+	ec2d[1] = 0x00E0149A8283B156;
+	ec2d[2] = 0x198E80F2EEF3D130;
+	ec2d[3] = 0xA406D9DC56DFFCE7;
+	ec2ds = #copy(ec2d);
+	
+	pre2p = pre2;
+	pre2ps = pre2p;
+	
+	s2s = #copy(s2);
+	slide1 = sc25519_slide(s1, S1_SWINDOWSIZE);
+	s2 = #copy(s2s);
+	slide2 = sc25519_slide(s2, S2_SWINDOWSIZE);
+	
+	for i=0 to 16{
+		pre1[i] = p1[i];
+	}
+	
+	tp = t;
+	pre1p_12 = pre1[0:12];
+	tp = ge25519_dbl_p1p1(tp, pre1p_12);
+	t = tp;
+	tp = t;
+	d1p = d1;
+	d1p = ge25519_p1p1_to_p3(d1p, tp);
+	d1  = d1p;
+	
+	d = __load_ptr4(pre1[0:4]);
+	ds = #copy(d);
+	xaddy = __load_ptr4(pre1[4:4]);
+	
+	ysubx = __sub4_rrp(xaddy, pre1[0:4]);
+	pre1[0:4] = __store_ptr4(pre1[0:4], ysubx);
+	xaddy = __add4_rrs(xaddy, ds);
+	pre1[4:4] = __store_ptr4(pre1[4:4], xaddy);
+	t2d = __load_ptr4(pre1[12:4]);
+	t2d = __mul4_rsr(ec2ds, t2d);
+	pre1[12:4] = __store_ptr4(pre1[12:4], t2d);
+	
+	for i=0 to PRE1_SIZE-1{
+		offs = 16*(i+1);
+		
+		tp = t;
+		pre1p = pre1[16*i:16];
+		d1p = d1;
+		tp = ge25519_pnielsadd_p1p1(tp, d1p, pre1p);
+		t = tp;
+		pre1p = pre1[offs:16];
+		tp = t;
+		pre1p = ge25519_p1p1_to_p3(pre1p, tp);
+		pre1[offs:16] = pre1p;
+		
+		
+		d = __load_ptr4(pre1[offs : 4]);
+		ds = #copy(d);
+		xaddy = __load_ptr4(pre1[offs + 4 : 4]);
+	
+		ysubx = __sub4_rrp(xaddy, pre1[offs : 4]);
+		pre1[offs : 4] = __store_ptr4(pre1[offs : 4], ysubx);
+		
+		xaddy = __add4_rrs(xaddy, ds);
+		pre1[offs + 4 : 4] = __store_ptr4(pre1[offs + 4 : 4], xaddy);
+		
+		t2d = __load_ptr4(pre1[offs + 12:4]);
+		t2d = __mul4_rsr(ec2ds, t2d);
+		pre1[offs + 12 : 4] = __store_ptr4(pre1[offs + 12 : 4], t2d);
+	}
+	
+	r = __init_point_inf_p(r);
+	
+	j = 255;
+	while(j >=s 0){
+		slide_8 = slide1[(int)j];
+		slide_8 |= slide2[(int)j];
+		if(slide_8 != 0){
+			k = j;
+			j = -1;
+		}
+		j -= 1;
+	}
+	
+	while(k >=s 0){
+		tp = t;
+		rp = r[0:12];
+		tp = ge25519_dbl_p1p1(tp, rp);
+		t = tp;
+		
+		slide_8 = slide1[(int)k];
+		if(slide_8 >s 0){
+			tp = t;
+			r = ge25519_p1p1_to_p3(r, tp);
+			slide_8 = slide_8 >> 1;
+			pre1p = pre1[(int)slide_8:16];
+			tp = t;
+			tp = ge25519_pnielsadd_p1p1(tp, r, pre1p);
+			t = tp;
+		}
+		else{
+			slide_8 = slide1[(int)k];
+			if(slide_8 <s 0){
+				tp = t;
+				r = ge25519_p1p1_to_p3(r, tp);
+				slide_8 = -slide_8;
+				slide_8 = slide_8 >> 1;
+				
+				neg[0] = pre1[(int)slide_8 + 4];
+				neg[1] = pre1[(int)slide_8 + 5];
+				neg[2] = pre1[(int)slide_8 + 6];
+				neg[3] = pre1[(int)slide_8 + 7];
+				neg[4] = pre1[(int)slide_8 + 0];
+				neg[5] = pre1[(int)slide_8 + 1];
+				neg[6] = pre1[(int)slide_8 + 2];
+				neg[7] = pre1[(int)slide_8 + 3];
+				neg[8] = pre1[(int)slide_8 + 8];
+				neg[9] = pre1[(int)slide_8 + 9];
+				neg[10] = pre1[(int)slide_8 + 10];
+				neg[11] = pre1[(int)slide_8 + 11];
+				reg_64[0] = 0;
+				reg_64[1] = 0;
+				reg_64[2] = 0;
+				reg_64[3] = 0;
+				t2d = __sub4_rrp(reg_64, neg[12:4]);
+				neg[12:4] = __store_ptr4(neg[12:4], t2d);
+				tp = t;
+				tp = ge25519_pnielsadd_p1p1(tp, r, neg);
+				t = tp;
+			}
+		}
+		
+		slide_8 = slide2[(int)k];
+		if(slide_8 >s 0){
+			tp = t;
+			r = ge25519_p1p1_to_p3(r, tp);
+			slide_8 = slide_8 >> 1;
+			pre2p = pre2ps;
+			pre2p_16 = pre2p[(int)slide_8:16];
+			tp = t;
+			tp = ge25519_pnielsadd_p1p1(tp, r, pre2p_16);
+			t = tp;
+		}
+		else{
+			slide_8 = slide2[(int)k];
+			if(slide_8 <s 0){
+				tp = t;
+				r = ge25519_p1p1_to_p3(r, tp);
+				slide_8 = -slide_8;
+				slide_8 = slide_8 >> 1;
+				
+				nneg[0] = pre2[(int)slide_8 + 4];
+				nneg[1] = pre2[(int)slide_8 + 5];
+				nneg[2] = pre2[(int)slide_8 + 6];
+				nneg[3] = pre2[(int)slide_8 + 7];
+				nneg[4] = pre2[(int)slide_8 + 0];
+				nneg[5] = pre2[(int)slide_8 + 1];
+				nneg[6] = pre2[(int)slide_8 + 2];
+				nneg[7] = pre2[(int)slide_8 + 3];
+				
+				reg_64[0] = 0;
+				reg_64[1] = 0;
+				reg_64[2] = 0;
+				reg_64[3] = 0;
+				t2d = __sub4_rrp(reg_64, nneg[8:4]);
+				nneg[8:4] = __store_ptr4(nneg[8:4], t2d);
+				tp = t;
+				tp = ge25519_nielsadd_p1p1(tp, r, nneg);
+				t = tp;
+			}
+		}
+		tp = t;
+		rp = r[0:12];
+		rp = ge25519_p1p1_to_p2(rp, tp);
+		r[0:12] = rp;
+		
+		k -= 1;
+	}
+	
+	return r;
+}
+
+export fn j_double_scalarmult(reg u64 rp p1p s1p s2p) -> reg u64{
+	stack u64[16] r p1;
+	reg ptr u64[16] rptr p1ptr;
+	reg u64[4] s1 s2;
+	reg u64 rax;
+	inline int i;
+	
+	rptr = r;
+	p1ptr = p1;
+	
+	for i=0 to 16{
+		rptr[i] = [rp + 8*i];
+		p1ptr[i] = [p1p + 8*i];
+	}
+	
+	for i = 0 to 4{
+		s1[i] = [s1p + 8*i];
+		s2[i] = [s2p + 8*i];
+	}
+	rptr = ge25519_double_scalarmult_vartime(rptr, p1ptr, s1, s2);
+	
+	for i=0 to 16{
+		[rp + 8*i] = rptr[i];
+	}
+	
+	rax = 0;
+	return rax;
+}

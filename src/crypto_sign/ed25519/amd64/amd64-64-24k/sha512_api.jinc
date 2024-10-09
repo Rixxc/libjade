@@ -1,0 +1,482 @@
+/*
+State:
+0-15: Buffered message (128 bytes)
+16-23: Internal SHA state (64 bytes)
+24: Input Length (1 byte)
+*/
+
+require "sha512.jinc"
+require "sha512_globals.jinc"
+
+fn sha512_init(reg ptr u64[25] pstate) -> reg ptr u64[25]
+{
+  inline int i;
+  reg ptr u64[8] Hp;
+  reg u64 v;
+
+  Hp = SHA512_H;
+
+  for i=0 to 16
+  {
+  	pstate[i] = 0;
+  }
+  for i=0 to 8
+  { v = Hp[i];
+    pstate[16 + i] = v; }
+  
+  pstate[24] = 0;
+  
+  return pstate;
+}
+
+fn sha512_update_1(reg ptr u64[25] pstate, reg u8 m) -> reg ptr u64[25] // tested
+{
+	reg u64 mod_len;
+	reg u64 temp;
+	
+	// Update len
+	temp = pstate[24];
+	mod_len = temp;
+	temp += 1;
+	pstate[24] = temp;
+	
+	mod_len = mod_len & 0x7f;
+	
+	pstate[u8 (int)mod_len] = m;
+	
+	if (mod_len == 127) {
+		pstate = _blocks_0_ref(pstate);
+	}
+
+	return pstate;
+}
+
+fn sha512_update_8(reg ptr u64[25] pstate, reg u64 m) -> reg ptr u64[25]
+{
+	reg u64 mod_len limb_1_size c_block;
+	reg u64 temp aux mask;
+	stack u64 c_block_s m_s;
+	
+	// Update len
+	temp = pstate[24];
+	mod_len = temp;
+	temp += 8;
+	pstate[24] = temp;
+	
+	mod_len = mod_len & 0x7f;
+	
+	limb_1_size = 0x7;
+	limb_1_size = limb_1_size & mod_len;
+	limb_1_size = limb_1_size << 3;
+	limb_1_size = limb_1_size;
+	c_block = mod_len >> 3;
+	
+	mask = 0x0000000000000001;
+	_, _, _, _, _, mask = #SHL(mask, limb_1_size);
+	mask -= 1;
+	
+	_, _, m = #ROL(m, limb_1_size);
+	temp = m;
+	m = m & mask;
+	mask = !mask;
+	temp = temp & mask;
+	
+	aux = pstate[(int) c_block];
+	aux = aux | temp;
+	pstate[(int) c_block] = aux;
+	
+	c_block += 1;
+	c_block = c_block & 0xf;
+	c_block_s = c_block;
+	m_s = m;
+	
+	if (c_block == 0) {
+		pstate = _blocks_0_ref(pstate);
+	}
+	
+	m = m_s;
+	c_block = c_block_s;
+	pstate[(int) c_block] = m;
+	
+	return pstate;
+}
+
+fn __sha512_update_32(reg ptr u64[25] pstate, reg u64 m0 m1 m2 m3) -> reg ptr u64[25]
+{
+	reg u64 mod_len limb_1_size c_block;
+	reg u64 temp aux mask;
+	reg u64[4] m;
+	stack u64[4] m_s;
+	stack u64 c_block_s;
+	
+	m[0] = m0;
+	m[1] = m1;
+	m[2] = m2;
+	m[3] = m3;
+	
+	// Update len	
+	temp = pstate[24];
+	mod_len = temp;
+	temp += 32;
+	pstate[24] = temp;
+	
+	mod_len = mod_len & 0x7f;
+	
+	limb_1_size = 0x7;
+	limb_1_size = limb_1_size & mod_len;
+	limb_1_size = limb_1_size << 3;
+	limb_1_size = limb_1_size;
+	c_block = mod_len >> 3;
+	
+	mask = 0x0000000000000001;
+	_, _, _, _, _, mask = #SHL(mask, limb_1_size);
+	mask -= 1;
+	
+	_, _, m[0] = #ROL(m[0], limb_1_size);
+	temp = m[0];
+	m[0] = m[0] & mask;
+	mask = !mask;
+	temp = temp & mask;
+	
+	aux = pstate[(int) c_block];
+	aux = aux | temp;
+	pstate[(int) c_block] = aux;
+	
+	_, _, m[1] = #ROL(m[1], limb_1_size);
+	temp = m[1];
+	temp = temp & mask;
+	mask = !mask;
+	m[1] = m[1] & mask;
+	
+	m[0] = m[0] | temp;
+	
+	_, _, m[2] = #ROL(m[2], limb_1_size);
+	temp = m[2];
+	m[2] = m[2] & mask;
+	mask = !mask;
+	temp = temp & mask;
+	m[1] = m[1] | temp;
+	
+	_, _, m[3] = #ROL(m[3], limb_1_size);
+	temp = m[3];
+	temp = temp & mask;
+	mask = !mask;
+	m[3] = m[3] & mask;
+	m[2] = m[2] | temp;
+	
+	c_block += 1;
+	c_block = c_block & 0xf;
+	c_block_s = c_block;
+	m_s = #copy(m);
+	
+	if (c_block == 0) {
+		pstate = _blocks_0_ref(pstate);
+	}
+	
+	m[0] = m_s[0];
+	c_block = c_block_s;
+	pstate[(int) c_block] = m[0];
+	
+	c_block += 1;
+	c_block = c_block & 0xf;
+	c_block_s = c_block;
+	
+	if (c_block == 0) {
+		pstate = _blocks_0_ref(pstate);
+	}
+	
+	m[1] = m_s[1];
+	c_block = c_block_s;
+	pstate[(int) c_block] = m[1];
+	
+	c_block += 1;
+	c_block = c_block & 0xf;
+	c_block_s = c_block;
+	
+	if (c_block == 0) {
+		pstate = _blocks_0_ref(pstate);
+	}
+	
+	m[2] = m_s[2];
+	c_block = c_block_s;
+	pstate[(int) c_block] = m[2];
+	
+	c_block += 1;
+	c_block = c_block & 0xf;
+	c_block_s = c_block;
+	
+	if (c_block == 0) {
+		pstate = _blocks_0_ref(pstate);
+	}
+	
+	m[3] = m_s[3];
+	c_block = c_block_s;
+	pstate[(int) c_block] = m[3];
+	
+	return pstate;
+}
+
+inline fn sha512_update_32(reg ptr u64[25] pstate, reg u64[4] m) -> reg ptr u64[25] {
+	reg u64 m0 m1 m2 m3;
+	
+	m0 = m[0];
+	m1 = m[1];
+	m2 = m[2];
+	m3 = m[3];
+	
+	pstate = __sha512_update_32(pstate, m0, m1, m2, m3);
+	
+	return pstate;
+}
+
+fn sha512_update_block(reg ptr u64[25] pstate, reg ptr u64[16] m) -> reg ptr u64[25]
+{
+	reg u64 mod_len modulus limb_1_size c_block;
+	reg u64 temp aux mask m_0 m_1;	
+	stack u64 c_block_s;
+	stack u64[16] m_s;
+	inline int i;
+	
+	for i=0 to 16
+	{
+		temp = m[i];
+		m_s[i] = temp;
+	}
+	// Update len	
+	temp = pstate[24];
+	mod_len = temp;
+	temp += 128;
+	pstate[24] = temp;
+	
+	modulus = 128;
+	mod_len = mod_len % modulus;
+	
+	limb_1_size = 0x7;
+	limb_1_size = limb_1_size & mod_len;
+	limb_1_size = limb_1_size << 3;
+	limb_1_size = limb_1_size;
+	c_block = mod_len >> 3;
+	
+	mask = 0x0000000000000001;
+	_, _, _, _, _, mask = #SHL(mask, limb_1_size);
+	mask -= 1;
+	
+	m_0 = m_s[0];
+	_, _, m_0 = #ROL(m_0, limb_1_size);
+	temp = m_0;
+	
+	mask = !mask;
+	temp = temp & mask;
+	mask = !mask;
+	m_0 = m_0 & mask;
+	m_s[0] = m_0;
+	
+	aux = pstate[(int) c_block];
+	aux = aux | temp;
+	pstate[(int) c_block] = aux;
+	
+	for i=0 to 15
+	{
+		m_0 = m_s[i];
+		m_1 = m_s[i+1];
+		_, _, m_1 = #ROL(m_1, limb_1_size);
+		temp = m_1;
+		m_1 = m_1 & mask;
+		mask = !mask;
+		temp = temp & mask;
+		mask = !mask;
+	
+		m_0 = m_0 | temp;
+		m_s[i] = m_0;
+		m_s[i+1] = m_1;
+	}
+	
+	for i = 0 to 16
+	{
+		c_block += 1;
+		c_block = c_block & 0xf;
+		c_block_s = c_block;
+	
+		if (c_block == 0) {
+			pstate = _blocks_0_ref(pstate);
+		}
+	
+		m_0 = m_s[i];
+		c_block = c_block_s;
+		pstate[(int) c_block] = m_0;
+	}
+	
+	return pstate;
+}
+
+fn sha512_update_ext(reg ptr u64[25] pstate, reg u64 m, reg u64 inlen) -> reg ptr u64[25]
+{
+	reg u64 mod_len total_len iterations;
+	reg u64 i j aux;	
+	stack u64 total_s inlen_s iter_s i_s j_s m_s;
+
+	m_s = m;
+	inlen = inlen;
+	// Update len
+	total_len = pstate[24];
+	mod_len = total_len;
+	total_len = total_len + inlen;
+	pstate[24] = total_len;
+	
+	mod_len = mod_len & 0x7f;	
+	iterations = mod_len;
+	iterations = iterations + inlen;
+	total_s = iterations;
+	inlen_s = inlen;
+	
+	iterations = iterations >> 7;
+	iter_s = iterations;
+	
+	i = 0;
+	j = 0;
+	
+	while (j < iterations) {
+		m = m_s;
+		while (mod_len < 128) {
+			pstate[u8 (int)mod_len] = (u8)[m + i];
+			mod_len += 1;
+			i += 1;
+		}
+		
+		i_s = i;
+		j_s = j;
+
+		pstate = _blocks_0_ref(pstate);
+		i = i_s;
+		j = j_s;
+		iterations = iter_s;
+		mod_len = 0;
+		j += 1;
+		inlen = total_s;
+		inlen = inlen & 0x7f;
+		inlen_s = inlen;
+	}
+	
+	m = m_s;
+	inlen = inlen_s;
+	while (inlen > 0) {
+		pstate[u8 (int)mod_len] = (u8)[m + i];
+		mod_len += 1;
+		i += 1;
+		inlen -= 1;
+	}
+	return pstate;
+}
+
+fn sha512_update_ext_align(reg ptr u64[25] pstate, reg u64 m, reg u64 inlen) -> reg ptr u64[25]
+{
+	reg u64 mod_len total_len iterations;
+	reg u64 i j aux;	
+	stack u64 total_s inlen_s iter_s i_s j_s m_s;
+
+	m_s = m;
+	inlen = inlen;
+	// Update len
+	total_len = pstate[24];
+	mod_len = total_len;
+	total_len = total_len + inlen;
+	pstate[24] = total_len;
+	
+	mod_len = mod_len & 0x7f;	
+	iterations = mod_len;
+	iterations = iterations + inlen;
+	total_s = iterations;
+	inlen_s = inlen;
+	
+	iterations = iterations >> 7;
+	iter_s = iterations;
+	
+	mod_len = mod_len >> 3;
+	i = 0;
+	j = 0;
+	
+	while (j < iterations) {
+		m = m_s;
+		while (mod_len < 16) {
+			pstate[u64 (int)mod_len] = (u64)[m + i];
+			mod_len += 1;
+			i += 8;
+		}
+		
+		i_s = i;
+		j_s = j;
+
+		pstate = _blocks_0_ref(pstate);
+		i = i_s;
+		j = j_s;
+		iterations = iter_s;
+		mod_len = 0;
+		j += 1;
+		inlen = total_s;
+		inlen = inlen & 0x7f;
+		inlen_s = inlen;
+	}
+	
+	m = m_s;
+	inlen = inlen_s;
+	while (inlen > 7) {
+		pstate[u64 (int)mod_len] = (u64)[m + i];
+		mod_len += 1;
+		i += 8;
+		inlen -= 8;
+	}
+	
+	mod_len *= 8;
+	
+	while (inlen > 0) {
+		pstate[u8 (int)mod_len] = (u8)[m + i];
+		mod_len += 1;
+		i += 1;
+		inlen -= 1;
+	}
+	return pstate;
+}
+
+fn sha512_finalize(reg ptr u64[25] pstate, reg ptr u64[8] Hreg) -> reg ptr u64[8]
+{
+	stack u8[128] in;
+	reg ptr u64[8] Hp;
+	stack u64[8] Hs;
+	inline int i;
+	
+	stack u64[32] sblocks;
+  reg ptr u64[32] sblocksp;
+  
+	reg u64 len mod_len nblocks;
+	reg u64 temp;
+	
+	Hp = Hs;
+	
+	for i = 0 to 16{
+	  temp = pstate[i];
+	  in[u64 i] = temp;
+	}
+	
+	len = pstate[24];
+	temp = len;
+	mod_len = len & 0x7f;
+	mod_len = mod_len;
+	temp = temp << 3;
+	
+	sblocks, nblocks = __lastblocks_ref(in, mod_len, temp);
+  sblocksp = sblocks;
+  
+  for i=0 to 8{
+		Hp[i] = pstate[16 + i];
+	}
+  
+  Hp, _ = _blocks_1_ref(Hp, sblocksp, nblocks);
+  
+  for i=0 to 8{
+  	temp = Hp[i];
+  	temp = #BSWAP_64(temp);
+		Hreg[i] = temp;
+	}
+ 
+  return Hreg;
+}

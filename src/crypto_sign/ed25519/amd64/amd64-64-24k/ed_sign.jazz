@@ -1,0 +1,43 @@
+from Jade require "crypto_sign/ed25519/amd64/common/load_store4.jinc"
+require "ed25519.jinc"
+
+
+export fn get_ed25519_keygen(reg u64 skp pkp) -> reg u64
+{
+  reg u64 r;
+  
+  skp = skp;
+  pkp = pkp;
+  
+  r = jade_ed25519_amd64_keygen(skp, pkp);
+  
+  return r;
+}
+
+export fn get_ed25519_sig(reg u64 skp mp msg_len sigp) -> reg u64
+{
+  reg u64 r;
+  
+  skp = skp;
+  mp = mp;
+  msg_len = msg_len;
+  sigp = sigp;
+  
+  r = jade_ed25519_amd64_sign(skp, mp, msg_len, sigp);
+  
+  return r;
+}
+
+export fn get_ed25519_vrfy(reg u64 sigp pkp mp msg_len) -> reg u64
+{
+  reg u64 r;
+  
+  pkp = pkp;
+  mp = mp;
+  msg_len = msg_len;
+  sigp = sigp;
+  
+  r = jade_ed25519_amd64_verify(sigp, pkp, mp, msg_len);
+  
+  return r;
+}

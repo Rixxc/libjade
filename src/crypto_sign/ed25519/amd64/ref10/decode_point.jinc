@@ -1,0 +1,136 @@
+from Jade require "crypto_sign/ed25519/amd64/common/64/cmp4.jinc"
+from Jade require "crypto_sign/ed25519/amd64/common/64/sub4.jinc"
+from Jade require "crypto_sign/ed25519/amd64/common/64/add4.jinc"
+from Jade require "crypto_sign/ed25519/amd64/ref10/sqr_root4.jinc"
+from Jade require "crypto_sign/ed25519/amd64/ref10/invert4.jinc"
+from Jade require "crypto_sign/ed25519/amd64/ref10/reduce_p4.jinc"
+
+inline fn __decode_point(stack u64[4] y d ps) -> stack u64[4], stack u64[4], stack u64[4], stack u64[4], stack u8
+{
+  stack u64[4] m1 x x2 x3 ys z3 t sqrt_m1s;
+  reg u64[4] sqrt_m1;
+  reg u64 z cond temp_64;
+  reg u8 temp temp_aux sign;
+  stack u8 signs;
+  stack u8 valid;
+  inline int i;
+  
+  for i=0 to 4
+	{
+		temp_64 = y[3-i];
+		temp_64 = #BSWAP_64(temp_64);
+		ys[i] = temp_64;
+	}
+  y = #copy(ys);
+  
+  // Establish constants and write them to the stack
+  /*p[0] = 0xffffffffffffffed;
+  p[1] = 0xffffffffffffffff;
+  p[2] = 0xffffffffffffffff;
+  p[3] = 0x7fffffffffffffff;*/
+  
+  sqrt_m1[0] = 0xc4ee1b274a0ea0b0;
+  sqrt_m1[1] = 0x2f431806ad2fe478;
+  sqrt_m1[2] = 0x2b4d00993dfbd7a7;
+  sqrt_m1[3] = 0x2b8324804fc1df0b;
+  
+  m1[0] = 1;
+  m1[1] = 0;
+  m1[2] = 0;
+  m1[3] = 0;
+  
+  // ps = #copy(p);
+  sqrt_m1s = #copy(sqrt_m1);
+  
+  valid = 1;
+  
+  // Get the MSB of y as sign and discard MSB
+  temp = y[u8 31];
+  temp_aux = temp;
+  sign = temp_aux >> 7;
+  temp &= 0x7f;
+  y[u8 31] = temp;
+  
+  signs = sign;
+  
+  // Check if y < p
+  temp = __cmp4_ss(ps, y);
+  if (temp != -1){
+    valid = 0;
+  }
+  
+  x3 = __sqr4_ss(y);
+  x2 = __mul4_sss(x3, d); // d * y * y
+  x3 = __sub4_sss(x3, m1); // y * y - 1
+  x2 = __add4_sss(x2, m1); // d * y * y + 1
+  x2 = __invert4_ss(x2);
+  x2 = __mul4_sss(x2, x3);
+  
+  x = __sqr_root4_ss(x2);
+  
+  x3 = __sqr4_ss(x);
+  x3 = __sub4_sss(x3, x2);
+  
+  // If (x*x - x2) % p != 0 multiply with squareroot of minus one
+  cond = x3[0];
+  cond |= x3[1];
+  cond |= x3[2];
+  cond |= x3[3];
+  if(cond != 0){
+  	x = __mul4_sss(x, sqrt_m1s);
+  }
+  
+  x3 = __sqr4_ss(x);
+  x3 = __sub4_sss(x3, x2);
+  
+  cond = x3[0];
+  cond |= x3[1];
+  cond |= x3[2];
+  cond |= x3[3];
+  if(cond != 0){
+    valid = 0;
+  }
+  
+  x = __reduce_p4(x, ps);
+  
+  sign = signs;
+  
+  temp = x[u8 0];
+  temp = temp & 1;
+  
+  if(temp != sign){
+    x = __sub4_sss(ps, x);
+  }
+  
+  t = __mul4_sss(x, y);
+  t = __reduce_p4(t, ps);
+  
+  ?{}, z = #set0();
+  z3[0] = 1;
+  for i=1 to 4
+  { 
+    z3[i] = z;
+  }
+  
+  cond = x2[0];
+  cond |= x2[1];
+  cond |= x2[2];
+  cond |= x2[3];
+  sign = signs;
+  if (cond == 0){
+    if (sign != 0){
+      valid = 0;
+    }
+    
+    ?{}, z = #set0();
+		t[0] = z;
+		x[0] = z;
+    for i=1 to 4
+    {
+      t[i] = z;
+      x[i] = z;
+    }
+  }
+  
+  return x, y, z3, t, valid;
+}

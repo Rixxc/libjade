@@ -1,0 +1,142 @@
+from Jade require "crypto_sign/ed25519/amd64/common/64/add4.jinc"
+from Jade require "crypto_sign/ed25519/amd64/common/64/sub4.jinc"
+require "mul4.jinc"
+require "sqr4.jinc"
+
+
+fn ge25519_dbl_p1p1(reg ptr u64[16] r, reg ptr u64[12] p) -> reg ptr u64[16]
+{
+	reg u64[4] a b c d e t0;
+	reg u64[4] rx ry rz rt;
+	stack u64[4] as bs cs ds es rxs;
+	reg u64 z;
+	reg bool cf;
+	inline int i;
+	
+	a[0] = p[0];
+	a[1] = p[1];
+	a[2] = p[2];
+	a[3] = p[3];
+	a = __sqr4_rr(a);
+	as = #copy(a);
+	
+	b[0] = p[4];
+	b[1] = p[5];
+	b[2] = p[6];
+	b[3] = p[7];
+	b = __sqr4_rr(b);
+	bs = #copy(b);
+	
+	c[0] = p[8];
+	c[1] = p[9];
+	c[2] = p[10];
+	c[3] = p[11];
+	c = __sqr4_rr(c);
+	
+	?{}, z = #set0();
+	cf, c[0] += c[0];
+  for i=1 to 4
+  { cf, c[i] += c[i] + cf; }
+	
+  _, z -= z - cf;
+  z &= 38;
+
+  cf, c[0] += z;
+  for i=1 to 4
+  { cf, c[i] += 0 + cf; }
+
+  _, z -= z - cf;
+  z &= 38;
+  c[0] += z;
+  
+	cs = #copy(c);
+	
+	d[0] = 0;
+	d[1] = 0;
+	d[2] = 0;
+	d[3] = 0;
+	
+	?{}, z = #set0();
+	
+  cf, d[0] -= as[0];
+  for i=1 to 4
+  { cf, d[i] -= as[i] - cf; }
+
+  _, z -= z - cf;
+  z &= 38;
+
+  cf, d[0] -= z;
+  for i=1 to 4
+  { cf, d[i] -= 0 - cf; }
+
+  _, z -= z - cf;
+  z &= 38;
+  d[0] -= z;
+  
+  ds = #copy(d);
+  
+  e[0] = 0;
+	e[1] = 0;
+	e[2] = 0;
+	e[3] = 0;
+	
+	?{}, z = #set0();
+	
+  cf, e[0] -= bs[0];
+  for i=1 to 4
+  { cf, e[i] -= bs[i] - cf; }
+
+  _, z -= z - cf;
+  z &= 38;
+
+  cf, e[0] -= z;
+  for i=1 to 4
+  { cf, e[i] -= 0 - cf; }
+
+  _, z -= z - cf;
+  z &= 38;
+  e[0] -= z;
+  
+  es = #copy(e);
+  
+	rz = __add4_rrs(d, bs);
+	r[4] = rz[0];
+	r[5] = rz[1];
+	r[6] = rz[2];
+	r[7] = rz[3];
+	
+	d = __sub4_rrs(d, bs);
+	r[8] 	= d[0];
+	r[9] 	= d[1];
+	r[10] = d[2];
+	r[11] = d[3];
+	
+	rz = __add4_rrs(rz, cs);
+	r[12] = rz[0];
+	r[13] = rz[1];
+	r[14] = rz[2];
+	r[15] = rz[3];
+	
+	rx[0] = p[0];
+	rx[1] = p[1];
+	rx[2] = p[2];
+	rx[3] = p[3];
+	
+	b[0] = p[4];
+	b[1] = p[5];
+	b[2] = p[6];
+	b[3] = p[7];
+	bs = #copy(b);
+	rx = __add4_rrs(rx, bs);
+	rxs = #copy(rx);
+	rx = __sqr4_rr(rx);
+	rx = __add4_rrs(rx, ds);
+	rx = __add4_rrs(rx, es);
+	
+	r[0] = rx[0];
+	r[1] = rx[1];
+	r[2] = rx[2];
+	r[3] = rx[3];
+	
+	return r;
+}

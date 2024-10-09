@@ -1,0 +1,170 @@
+from Jade require "crypto_sign/ed25519/amd64/common/64/add4.jinc"
+from Jade require "crypto_sign/ed25519/amd64/common/64/sub4.jinc"
+require "mul4.jinc"
+
+fn ge25519_pnielsadd_p1p1(reg ptr u64[16] rp pp qp) -> reg ptr u64[16]
+{
+	reg u64[4] a b c d e f g h q r;
+	stack u64[4] as bs cs ds es fs gs hs qs;
+	reg u64[4] rx ry rz rt;
+	reg u64 z;
+	reg bool cf;
+	stack ptr u64[16] rps;
+	stack ptr u64[12] qps;
+	inline int i;
+		
+	// a, b = p->Y
+	a[0] = pp[4];
+	a[1] = pp[5];
+	a[2] = pp[6];
+	a[3] = pp[7];
+	b = #copy(a);
+	
+	// r->Y = p->Y - p->X
+	?{}, z = #set0();
+	
+  cf, a[0] -= pp[0];
+  for i=1 to 4
+  { cf, a[i] -= pp[i] - cf; }
+
+  _, z -= z - cf;
+  z &= 38;
+
+  cf, a[0] -= z;
+  for i=1 to 4
+  { cf, a[i] -= 0 - cf; }
+
+  _, z -= z - cf;
+  z &= 38;
+  a[0] -= z;
+  
+	// r->X = p->Y + p->X
+	?{}, z = #set0();
+	cf, b[0] += pp[0];
+  for i=1 to 4
+  { cf, b[i] += pp[i] + cf; }
+	
+  _, z -= z - cf;
+  z &= 38;
+
+  cf, b[0] += z;
+  for i=1 to 4
+  { cf, b[i] += 0 + cf; }
+
+  _, z -= z - cf;
+  z &= 38;
+  b[0] += z;
+	
+	rps = rp;
+	as = #copy(a);
+	bs = #copy(b);
+	
+	// r->Y = r->Y * q->yminusx
+	q[0] = qp[0];
+	q[1] = qp[1];
+	q[2] = qp[2];
+	q[3] = qp[3];
+	as = __mul4_ssr(as, q);
+	// r->Z = r->X * q->yplusx
+	q[0] = qp[4];
+	q[1] = qp[5];
+	q[2] = qp[6];
+	q[3] = qp[7];
+	rx = __mul4_rsr(bs, q);
+	ry = #copy(rx);
+	
+	// r->Y = r->Z + r->Y
+	ry = __add4_rrs(ry, as);
+	
+	// r->X = r->Z - r->Y
+	rx = __sub4_rrs(rx, as);
+	
+	rp[0] = rx[0];
+	rp[1] = rx[1];
+	rp[2] = rx[2];
+	rp[3] = rx[3]; 
+	
+	rp[8] = ry[0];
+	rp[9] = ry[1];
+	rp[10] = ry[2];
+	rp[11] = ry[3];
+	
+	
+	
+	// r->T = q->xy2d * p->T
+	q[0] = qp[8];
+	q[1] = qp[9];
+	q[2] = qp[10];
+	q[3] = qp[11];
+	qs = #copy(q);
+	
+	rp = rps;
+	r[0] = pp[12];
+	r[1] = pp[13];
+	r[2] = pp[14];
+	r[3] = pp[15];
+	rps = rp;
+	
+	c = __mul4_rsr(qs, r);
+	cs = #copy(c);
+	
+	q[0] = qp[8];
+	q[1] = qp[9];
+	q[2] = qp[10];
+	q[3] = qp[11];
+	qs = #copy(q);
+	
+	rp = rps;
+	r[0] = pp[8];
+	r[1] = pp[9];
+	r[2] = pp[10];
+	r[3] = pp[11];
+	rps = rp;
+	
+	rt = __mul4_rsr(qs, r);
+	
+	// t0 = 2 * p->Z
+	?{}, z = #set0();
+	cf, rt[0] += rt[0];
+  for i=1 to 4
+  { cf, rt[i] += rt[i] + cf; }
+	
+  _, z -= z - cf;
+  z &= 38;
+
+  cf, rt[0] += z;
+  for i=1 to 4
+  { cf, rt[i] += 0 + cf; }
+
+  _, z -= z - cf;
+  z &= 38;
+  rt[0] += z;
+	
+	// g = t0
+	rz = #copy(rt);
+	
+	// r->Z = t0 + r->Z
+	rz = __add4_ssr(cs, rz);
+	
+	
+	// r->T = t0 - r->T
+	rt = __sub4_ssr(cs, rt);
+	
+	
+	// r(x,y,z,t) = e,h,g,f
+	// p = r
+	// r->X = p->X * p->T
+	rp[4] = rz[0];
+	rp[5] = rz[1];
+	rp[6] = rz[2];
+	rp[7] = rz[3];
+	
+	// r->Y = p->Y * p->Z
+	rp[12] = rt[0];
+	rp[13] = rt[1];
+	rp[14] = rt[2];
+	rp[15] = rt[3];
+	
+	return rp;
+}
+

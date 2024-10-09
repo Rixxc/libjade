@@ -1,0 +1,59 @@
+require "mul4.jinc"
+
+fn ge25519_p1p1_to_p2(reg ptr u64[12] r, reg ptr u64[16] p) -> reg ptr u64[12]
+{
+	reg u64[4] a b c d;
+	reg u64[4] rx ry rz rt;
+	stack u64[4] as bs;
+	
+	a[0] = p[0];
+	a[1] = p[1];
+	a[2] = p[2];
+	a[3] = p[3];
+	as = #copy(a);
+	
+	d[0] = p[12];
+	d[1] = p[13];
+	d[2] = p[14];
+	d[3] = p[15];
+	
+	rx = __mul4_rsr(as, d);
+	
+	r[0] = rx[0];
+	r[1] = rx[1];
+	r[2] = rx[2];
+	r[3] = rx[3];
+	
+	b[0] = p[4];
+	b[1] = p[5];
+	b[2] = p[6];
+	b[3] = p[7];
+	bs = #copy(b);
+	
+	c[0] = p[8];
+	c[1] = p[9];
+	c[2] = p[10];
+	c[3] = p[11];
+	
+	
+	ry = __mul4_rsr(bs, c);
+	
+	r[4] = ry[0];
+	r[5] = ry[1];
+	r[6] = ry[2];
+	r[7] = ry[3];
+	
+	d[0] = p[12];
+	d[1] = p[13];
+	d[2] = p[14];
+	d[3] = p[15];
+	
+	rz = __mul4_rsr(bs, d);
+	
+	r[8] 	= rz[0];
+	r[9] 	= rz[1];
+	r[10] = rz[2];
+	r[11] = rz[3];
+	
+	return r;
+}

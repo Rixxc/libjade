@@ -1,0 +1,260 @@
+from Jade require "crypto_sign/ed25519/amd64/common/bit.jinc"
+from Jade require "crypto_sign/ed25519/amd64/common/decode_scalar.jinc"
+
+from Jade require "crypto_sign/ed25519/amd64/common/64/decode_u4.jinc"
+from Jade require "crypto_sign/ed25519/amd64/common/64/init_points4.jinc"
+from Jade require "crypto_sign/ed25519/amd64/common/64/add4.jinc"
+from Jade require "crypto_sign/ed25519/amd64/common/64/sub4.jinc"
+from Jade require "crypto_sign/ed25519/amd64/common/64/cswap4.jinc"
+
+require "mul4.jinc"
+require "sqr4.jinc"
+require "ge.jinc"
+require "invert4.jinc"
+
+require "decode_point.jinc"
+require "encode_point.jinc"
+
+u64[4] p = {0xffffffffffffffed, 0xffffffffffffffff, 0xffffffffffffffff, 0x7fffffffffffffff};
+
+inline fn __add_and_double4(
+  stack u64[4] x1,
+  stack u64[4] y1,
+  stack u64[4] z1,
+  stack u64[4] t1,
+  stack u64[4] x2,
+  stack u64[4] y2,
+  stack u64[4] z2,
+  stack u64[4] t2,
+  stack u64[4] d)
+  ->
+  stack u64[4],
+  stack u64[4],
+  stack u64[4],
+  stack u64[4],
+  stack u64[4],
+  stack u64[4],
+  stack u64[4],
+  stack u64[4]
+{
+  stack u64[4] x3 y3 z3 t3 x4 y4 z4 t4;
+  stack u64[4] x1s y1s z1s;
+  stack u64[4] a b c d2 e f g h;
+  reg u64[4] x1r x2r ar;
+  
+  x1s = #copy(x1);
+  // x2r = #copy(x2);
+  y1s = #copy(y1);
+  z1s = #copy(z1);
+    
+  a = __sub4_sss(y1, x1);
+  b = __sub4_sss(y2, x2);
+  a = __mul4_sss(b, a);
+  
+  b = __add4_sss(y1, x1);
+  c = __add4_sss(y2, x2);
+  b = __mul4_sss(b, c);
+  
+  c = __mul4_a24_ss(t1, 2);
+  d2 = __mul4_sss(d, t2);
+  c = __mul4_sss(c, d2);
+  
+  d = __mul4_a24_ss(z1, 2);
+  d = __mul4_sss(d, z2);
+  
+  e = __sub4_sss(b, a);
+  f = __sub4_sss(d, c);
+  g = __add4_sss(d, c);
+  h = __add4_sss(b, a);
+  
+  x4 = __mul4_sss(e, f);
+  y4 = __mul4_sss(g, h);
+  z4 = __mul4_sss(f, g);
+  t4 = __mul4_sss(e, h);
+  
+  
+  a = __sqr4_ss(x1s);
+  b = __sqr4_ss(y1s);
+  c = __sqr4_ss(z1s);
+  c = __mul4_a24_ss(c, 2);
+  
+  h = __add4_sss(a, b);
+  e = __add4_sss(x1s, y1s);
+  e = __sqr4_ss(e);
+  e = __sub4_sss(h, e);
+  g = __sub4_sss(a, b);
+  f = __add4_sss(c, g);
+  
+  x3 = __mul4_sss(e, f);
+  y3 = __mul4_sss(g, h);
+  z3 = __mul4_sss(f, g);
+  t3 = __mul4_sss(e, h);
+  
+  return x3, y3, z3, t3, x4, y4, z4, t4;
+}
+
+inline fn __montgomery_ladder_step4(
+  stack u8[32] k,
+  stack u64[4] x2,
+  stack u64[4] y2,
+  stack u64[4] z2,
+  stack u64[4] t2,
+  stack u64[4] x3,
+  stack u64[4] y3,
+  stack u64[4] z3,
+  stack u64[4] t3,
+  stack u64[4] d,
+  stack u64    swapped,
+  reg   u64    ctr)
+  ->
+  stack u64[4],
+  stack u64[4],
+  stack u64[4],
+  stack u64[4],
+  stack u64[4],
+  stack u64[4],
+  stack u64[4],
+  stack u64[4],
+  stack u64
+{
+  reg u64 toswap bit;
+
+  bit = __ith_bit(k, ctr);
+
+  toswap  = swapped;
+  toswap ^= bit;
+
+  x2, y2, z2, t2, x3, y3, z3, t3 = __cswap4(x2, y2, z2, t2, x3, y3, z3, t3, toswap);
+  swapped = bit;
+
+  x2, y2, z2, t2, x3, y3, z3, t3 = __add_and_double4(x2, y2, z2, t2, x3, y3, z3, t3, d);
+
+  return x2, y2, z2, t2, x3, y3, z3, t3, swapped;
+}
+
+
+inline fn __montgomery_ladder4(
+  stack u8[32] k,
+  stack u64[4] ds, 
+  stack u64[4] x3, 
+  stack u64[4] y3,
+  stack u64[4] z3,
+  stack u64[4] t3)
+  ->
+  stack u64[4],
+  stack u64[4],
+  stack u64[4]
+{
+  stack u64[4] x2 y2 z2 t2;
+  reg u64[4] d;
+  stack u64 ctrs swapped;
+  reg u64 ctr;
+  
+  (x2, y2, z2, t2) = __init_point_inf();
+
+  ctr = 256;
+  swapped = 0;
+
+  while
+  {
+  	
+    ctr -= 1;
+    ctrs = ctr;
+
+    (x2, y2, z2, t2, x3, y3, z3, t3, swapped) = 
+       __montgomery_ladder_step4(k, x2, y2, z2, t2, x3, y3, z3, t3, ds, swapped, ctr);
+
+    ctr = ctrs;
+  } ( ctr > 0 )
+	
+  x2, y2, z2, t2, x3, y3, z3, t3 = __cswap4(x2, y2, z2, t2, x3, y3, z3, t3, swapped);
+  return x2, y2, z2;
+}
+
+
+inline fn __curve25519_internal_mulx(stack u64[4] x3 y3 z3 t3 ds, stack u8[32] k) -> reg u64[4]
+{
+  stack u64[4] x2 y2 z2;
+  reg u64[4] r;
+  
+  (x2, y2, z2) = __montgomery_ladder4(k, ds, x3, y3, z3, t3);
+  r = __encode_point(x2, y2, z2, p);
+  
+  return r;
+}
+
+inline fn __curve25519_mulx(reg u64[4] _k _u) -> reg u64[4]
+{
+  stack u8[32] k;
+  stack u64[4] us x3 y3 z3 t3 ds;
+  stack u8 valid;
+  reg u64[4] r d;
+	
+  k = #copy(_k);
+  us = #copy(_u);
+  
+  d[0] = 0x75eb4dca135978a3;
+  d[1] = 0x00700a4d4141d8ab;
+  d[2] = 0x8cc740797779e898;
+  d[3] = 0x52036cee2b6ffe73;
+  ds = #copy(d);
+  
+  x3, y3, z3, t3, valid = __decode_point(us, ds, p);
+  r = __curve25519_internal_mulx(x3, y3, z3, t3, ds, k);
+	
+  return r;
+}
+
+fn _curve25519_mulx_base(reg u64 k0 k1 k2 k3) -> reg u64, reg u64, reg u64, reg u64
+{
+	stack u64[16] ger;
+	reg ptr u64[16] gerp;
+	reg u64[4] _k r;
+	stack u64[4] rx ry rz;
+	reg u64 r0 r1 r2 r3;
+	
+	_k[0] = k0;
+  _k[1] = k1;
+  _k[2] = k2;
+  _k[3] = k3;
+  
+  gerp = ger;
+  gerp = __ge25519_scalarmult_base(gerp, _k);
+	ger = gerp;
+	
+	rx = ger[0:4];
+	ry = ger[4:4];
+	rz = ger[8:4];
+	
+	r = __encode_point(rx, ry, rz, p);
+	
+	r0 = r[0];
+	r1 = r[1];
+	r2 = r[2];
+	r3 = r[3];
+	
+  return r0, r1, r2, r3;
+}
+
+inline fn __curve25519_mulx_base(reg u64[4] _k) -> reg u64[4]
+{
+	reg u64 k0 k1 k2 k3;
+	reg u64 r0 r1 r2 r3;
+	reg u64[4] r;
+	
+	k0 = _k[0];
+	k1 = _k[1];
+	k2 = _k[2];
+	k3 = _k[3];
+	
+  r0, r1, r2, r3 = _curve25519_mulx_base(k0, k1, k2, k3);
+  
+
+	r[0] = r0;
+	r[1] = r1;
+	r[2] = r2;
+	r[3] = r3;
+	
+  return r;
+}
+
