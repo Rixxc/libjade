@@ -26,7 +26,11 @@ fn jade_ed25519_amd64_keygen(reg u64 skp pkp) -> reg u64
   Hreg = H;
 	Hregs = Hreg;
 	
-  sks = #randombytes(sks);
+  reg u64 flag num_bytes;
+  while {
+    flag = 0;
+    sks, num_bytes = #randombytes(sks, flag);
+  } (num_bytes != 32)
 	sk = #copy(sks);
   
   skp = skps;
