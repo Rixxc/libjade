@@ -5,7 +5,7 @@ require "curve25519.jinc"
 require "reduce_q4.jinc"
 require "muladdq4.jinc"
 
-fn jade_ed25519_amd64_keygen(reg u64 skp pkp) -> reg u64
+export fn jade_ed25519_amd64_keygen(reg u64 skp pkp) -> reg u64
 {
   reg u64[4] sk pk h_red;
   stack u64[4] sks ks;
@@ -70,7 +70,7 @@ fn jade_ed25519_amd64_keygen(reg u64 skp pkp) -> reg u64
   return r;
 }
 
-fn jade_ed25519_amd64_sign(reg u64 skp mp msg_len sigp) -> reg u64
+export fn jade_ed25519_amd64_sign(reg u64 skp mp msg_len sigp) -> reg u64
 {
   inline int i;
   reg u64[4] k s temp h_red R input;
@@ -192,7 +192,7 @@ fn jade_ed25519_amd64_sign(reg u64 skp mp msg_len sigp) -> reg u64
   return r;
 }
 
-fn jade_ed25519_amd64_verify(reg u64 sigp pkp mp msg_len) -> reg u64
+export fn jade_ed25519_amd64_verify(reg u64 sigp pkp mp msg_len) -> reg u64
 {
   reg u64 [4] B R s A h_red;
   reg u64[4] s_enc r_enc p d;
