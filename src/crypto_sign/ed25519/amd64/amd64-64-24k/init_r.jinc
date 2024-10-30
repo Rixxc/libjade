@@ -1,14 +1,24 @@
-require "ge25519_base_niels.jinc"
+require "ge25519_base_niels_256.jinc"
+
+u64[4] v1234 = {1,2,3,4};
+u64[4] v5678 = {5,6,7,8};
+u64[4] _1 = {1,0,0,0};
 
 inline fn init_r(reg u64 b) -> stack u64[19]
 {	
-	reg ptr u64[6144] _basep;
+	reg ptr u256[1536] _basep;
 	stack u64[19] r;
 	reg bool c cf;
 	reg u64 mask pos u t;
-	reg u64[4] tysubx txaddy tt2d tt;
+	reg u64 mask subt0 subt1 u;
+	reg u256 cmp_1 cmp_2 cmp_3 cmp_4 cmp_5 cmp_6 cmp_7 cmp_8;
+	reg u128 b_128 u_128;
+	reg u256 b_256 u_256 t tt_256;
+	reg u256 tysubx txaddy tt2d;
+	reg u64[4] tysubxr txaddyr tt2dr tt;
+	stack u64[4] tysubxs txaddys tt2ds tts;
 	reg u64 subt0 subt1 temp;
-	stack u64[3] old_y;
+	stack u64[4] old_y;
 	
 	_basep = basep;
 	
@@ -21,338 +31,74 @@ inline fn init_r(reg u64 b) -> stack u64[19]
 	u += mask;
 	u ^= mask;
 	
-	tysubx[0] = 1;
-	tysubx[1] = 0;
-	tysubx[2] = 0;
-	tysubx[3] = 0;
+	tysubx = _1[u256 0];
+	txaddy = _1[u256 0];
+	tt2d =  #set0_256();
+	
+	u_128 = #set0_128();
+	u_256 = (256u)#VPINSR_2u64(u_128, u, 0);
+	u_256 = #VPBROADCAST_4u64(u_256);
+	cmp_1 = #VPCMPEQ_4u64(u_256, v1234[u256 0]);
+	cmp_5 = #VPCMPEQ_4u64(u_256, v5678[u256 0]);
+	
+	cmp_2 = #VPERMQ(cmp_1, 0x55);
+	cmp_6 = #VPERMQ(cmp_5, 0x55);
+	cmp_3 = #VPERMQ(cmp_1, 0xaa);
+	cmp_7 = #VPERMQ(cmp_5, 0xaa);
+	cmp_4 = #VPERMQ(cmp_1, 0xff);
+	cmp_8 = #VPERMQ(cmp_5, 0xff);
+	cmp_1 = #VPERMQ(cmp_1, 0x00);
+	cmp_5 = #VPERMQ(cmp_5, 0x00);
+	
+	tysubx = #VPBLENDVB_256(tysubx, _basep.[0], cmp_1);
+	txaddy = #VPBLENDVB_256(txaddy, _basep.[32*1], cmp_1);
+	tt2d	 = #VPBLENDVB_256(tt2d	, _basep.[32*2], cmp_1);
+	tysubx = #VPBLENDVB_256(tysubx, _basep.[32*3], cmp_2);
+	txaddy = #VPBLENDVB_256(txaddy, _basep.[32*4], cmp_2);
+	tt2d	 = #VPBLENDVB_256(tt2d	, _basep.[32*5], cmp_2);
+	tysubx = #VPBLENDVB_256(tysubx, _basep.[32*6], cmp_3);
+	txaddy = #VPBLENDVB_256(txaddy, _basep.[32*7], cmp_3);
+	tt2d	 = #VPBLENDVB_256(tt2d	, _basep.[32*8], cmp_3);
+	tysubx = #VPBLENDVB_256(tysubx, _basep.[32*9], cmp_4);
+	txaddy = #VPBLENDVB_256(txaddy, _basep.[32*10], cmp_4);
+	tt2d	 = #VPBLENDVB_256(tt2d	, _basep.[32*11], cmp_4);
+	tysubx = #VPBLENDVB_256(tysubx, _basep.[32*12], cmp_5);
+	txaddy = #VPBLENDVB_256(txaddy, _basep.[32*13], cmp_5);
+	tt2d	 = #VPBLENDVB_256(tt2d	, _basep.[32*14], cmp_5);
+	tysubx = #VPBLENDVB_256(tysubx, _basep.[32*15], cmp_6);
+	txaddy = #VPBLENDVB_256(txaddy, _basep.[32*16], cmp_6);
+	tt2d	 = #VPBLENDVB_256(tt2d	, _basep.[32*17], cmp_6);
+	tysubx = #VPBLENDVB_256(tysubx, _basep.[32*18], cmp_7);
+	txaddy = #VPBLENDVB_256(txaddy, _basep.[32*19], cmp_7);
+	tt2d	 = #VPBLENDVB_256(tt2d	, _basep.[32*20], cmp_7);
+	tysubx = #VPBLENDVB_256(tysubx, _basep.[32*21], cmp_8);
+	txaddy = #VPBLENDVB_256(txaddy, _basep.[32*22], cmp_8);
+	tt2d	 = #VPBLENDVB_256(tt2d	, _basep.[32*23], cmp_8);
+	
+	b_128 = #set0_128();
+	b_256 = (256u)#VPINSR_2u64(b_128, b, 0);
+	b_256 = #VPBROADCAST_4u64(b_256);
+	
+	b_256 = #VPSRA_8u32(b_256, 31);
+	t = tysubx;
+	tysubx = #VPBLENDVB_256(tysubx, txaddy, b_256);
+	txaddy = #VPBLENDVB_256(txaddy, t, b_256);
+	
+	old_y[u256 0] = txaddy;
+	tysubxs[u256 0] = tysubx;
+	txaddys[u256 0] = txaddy;
 
-	txaddy[0] = 1;
-	txaddy[1] = 0;
-	txaddy[2] = 0;
-	txaddy[3] = 0;
-	
-	?{"==" = c} = #CMP(u,1);
-	
-	t = _basep[(int)pos];
-	tysubx[0] = #CMOVcc_64(c, t, tysubx[0]);
-	t = _basep[(int)pos + 1];
-	tysubx[1] = #CMOVcc_64(c, t, tysubx[1]);
-	t = _basep[(int)pos + 2];
-	tysubx[2] = #CMOVcc_64(c, t, tysubx[2]);
-	t = _basep[(int)pos + 3];
-	tysubx[3] = #CMOVcc_64(c, t, tysubx[3]);
-	t = _basep[(int)pos + 4];
-	txaddy[0] = #CMOVcc_64(c, t, txaddy[0]);
-	t = _basep[(int)pos + 5];
-	txaddy[1] = #CMOVcc_64(c, t, txaddy[1]);
-	t = _basep[(int)pos + 6];
-	txaddy[2] = #CMOVcc_64(c, t, txaddy[2]);
-	t = _basep[(int)pos + 7];
-	txaddy[3] = #CMOVcc_64(c, t, txaddy[3]);
-
-	?{"==" = c} = #CMP(u,2);
-
-	t = _basep[(int)pos + 12];
-	tysubx[0] = #CMOVcc_64(c, t, tysubx[0]);
-	t = _basep[(int)pos + 13];
-	tysubx[1] = #CMOVcc_64(c, t, tysubx[1]);
-	t = _basep[(int)pos + 14];
-	tysubx[2] = #CMOVcc_64(c, t, tysubx[2]);
-	t = _basep[(int)pos + 15];
-	tysubx[3] = #CMOVcc_64(c, t, tysubx[3]);
-	t = _basep[(int)pos + 16];
-	txaddy[0] = #CMOVcc_64(c, t, txaddy[0]);
-	t = _basep[(int)pos + 17];
-	txaddy[1] = #CMOVcc_64(c, t, txaddy[1]);
-	t = _basep[(int)pos + 18];
-	txaddy[2] = #CMOVcc_64(c, t, txaddy[2]);
-	t = _basep[(int)pos + 19];
-	txaddy[3] = #CMOVcc_64(c, t, txaddy[3]);
-	
-	?{"==" = c} = #CMP(u,3);
-
-	t = _basep[(int)pos + 24];
-	tysubx[0] = #CMOVcc_64(c, t, tysubx[0]);
-	t = _basep[(int)pos + 25];
-	tysubx[1] = #CMOVcc_64(c, t, tysubx[1]);
-	t = _basep[(int)pos + 26];
-	tysubx[2] = #CMOVcc_64(c, t, tysubx[2]);
-	t = _basep[(int)pos + 27];
-	tysubx[3] = #CMOVcc_64(c, t, tysubx[3]);
-	t = _basep[(int)pos + 28];
-	txaddy[0] = #CMOVcc_64(c, t, txaddy[0]);
-	t = _basep[(int)pos + 29];
-	txaddy[1] = #CMOVcc_64(c, t, txaddy[1]);
-	t = _basep[(int)pos + 30];
-	txaddy[2] = #CMOVcc_64(c, t, txaddy[2]);
-	t = _basep[(int)pos + 31];
-	txaddy[3] = #CMOVcc_64(c, t, txaddy[3]);
-
-	?{"==" = c} = #CMP(u,4);
-
-	t = _basep[(int)pos + 36];
-	tysubx[0] = #CMOVcc_64(c, t, tysubx[0]);
-	t = _basep[(int)pos + 37];
-	tysubx[1] = #CMOVcc_64(c, t, tysubx[1]);
-	t = _basep[(int)pos + 38];
-	tysubx[2] = #CMOVcc_64(c, t, tysubx[2]);
-	t = _basep[(int)pos + 39];
-	tysubx[3] = #CMOVcc_64(c, t, tysubx[3]);
-	t = _basep[(int)pos + 40];
-	txaddy[0] = #CMOVcc_64(c, t, txaddy[0]);
-	t = _basep[(int)pos + 41];
-	txaddy[1] = #CMOVcc_64(c, t, txaddy[1]);
-	t = _basep[(int)pos + 42];
-	txaddy[2] = #CMOVcc_64(c, t, txaddy[2]);
-	t = _basep[(int)pos + 43];
-	txaddy[3] = #CMOVcc_64(c, t, txaddy[3]);
-	
-	?{"==" = c} = #CMP(u,5);
-
-	t = _basep[(int)pos + 48];
-	tysubx[0] = #CMOVcc_64(c, t, tysubx[0]);
-	t = _basep[(int)pos + 49];
-	tysubx[1] = #CMOVcc_64(c, t, tysubx[1]);
-	t = _basep[(int)pos + 50];
-	tysubx[2] = #CMOVcc_64(c, t, tysubx[2]);
-	t = _basep[(int)pos + 51];
-	tysubx[3] = #CMOVcc_64(c, t, tysubx[3]);
-	t = _basep[(int)pos + 52];
-	txaddy[0] = #CMOVcc_64(c, t, txaddy[0]);
-	t = _basep[(int)pos + 53];
-	txaddy[1] = #CMOVcc_64(c, t, txaddy[1]);
-	t = _basep[(int)pos + 54];
-	txaddy[2] = #CMOVcc_64(c, t, txaddy[2]);
-	t = _basep[(int)pos + 55];
-	txaddy[3] = #CMOVcc_64(c, t, txaddy[3]);
-	
-	?{"==" = c} = #CMP(u,6);
-
-	t = _basep[(int)pos + 60];
-	tysubx[0] = #CMOVcc_64(c, t, tysubx[0]);
-	t = _basep[(int)pos + 61];
-	tysubx[1] = #CMOVcc_64(c, t, tysubx[1]);
-	t = _basep[(int)pos + 62];
-	tysubx[2] = #CMOVcc_64(c, t, tysubx[2]);
-	t = _basep[(int)pos + 63];
-	tysubx[3] = #CMOVcc_64(c, t, tysubx[3]);
-	t = _basep[(int)pos + 64];
-	txaddy[0] = #CMOVcc_64(c, t, txaddy[0]);
-	t = _basep[(int)pos + 65];
-	txaddy[1] = #CMOVcc_64(c, t, txaddy[1]);
-	t = _basep[(int)pos + 66];
-	txaddy[2] = #CMOVcc_64(c, t, txaddy[2]);
-	t = _basep[(int)pos + 67];
-	txaddy[3] = #CMOVcc_64(c, t, txaddy[3]);
-	
-	?{"==" = c} = #CMP(u,7);
-
-	t = _basep[(int)pos + 72];
-	tysubx[0] = #CMOVcc_64(c, t, tysubx[0]);
-	t = _basep[(int)pos + 73];
-	tysubx[1] = #CMOVcc_64(c, t, tysubx[1]);
-	t = _basep[(int)pos + 74];
-	tysubx[2] = #CMOVcc_64(c, t, tysubx[2]);
-	t = _basep[(int)pos + 75];
-	tysubx[3] = #CMOVcc_64(c, t, tysubx[3]);
-	t = _basep[(int)pos + 76];
-	txaddy[0] = #CMOVcc_64(c, t, txaddy[0]);
-	t = _basep[(int)pos + 77];
-	txaddy[1] = #CMOVcc_64(c, t, txaddy[1]);
-	t = _basep[(int)pos + 78];
-	txaddy[2] = #CMOVcc_64(c, t, txaddy[2]);
-	t = _basep[(int)pos + 79];
-	txaddy[3] = #CMOVcc_64(c, t, txaddy[3]);
-	
-	?{"==" = c} = #CMP(u,8);
-
-	t = _basep[(int)pos + 84];
-	tysubx[0] = #CMOVcc_64(c, t, tysubx[0]);
-	t = _basep[(int)pos + 85];
-	tysubx[1] = #CMOVcc_64(c, t, tysubx[1]);
-	t = _basep[(int)pos + 86];
-	tysubx[2] = #CMOVcc_64(c, t, tysubx[2]);
-	t = _basep[(int)pos + 87];
-	tysubx[3] = #CMOVcc_64(c, t, tysubx[3]);
-	t = _basep[(int)pos + 88];
-	txaddy[0] = #CMOVcc_64(c, t, txaddy[0]);
-	t = _basep[(int)pos + 89];
-	txaddy[1] = #CMOVcc_64(c, t, txaddy[1]);
-	t = _basep[(int)pos + 90];
-	txaddy[2] = #CMOVcc_64(c, t, txaddy[2]);
-	t = _basep[(int)pos + 91];
-	txaddy[3] = #CMOVcc_64(c, t, txaddy[3]);
-	
-	?{"<s" = c} = #CMP(b,0);
-	t = tysubx[0];
-	tysubx[0] = #CMOVcc_64(c, txaddy[0], tysubx[0]);
-	txaddy[0] = #CMOVcc_64(c, t, txaddy[0]);
-	
-	t = tysubx[1];
-	tysubx[1] = #CMOVcc_64(c, txaddy[1], tysubx[1]);
-	txaddy[1] = #CMOVcc_64(c, t, txaddy[1]);
-
-	t = tysubx[2];
-	tysubx[2] = #CMOVcc_64(c, txaddy[2], tysubx[2]);
-	txaddy[2] = #CMOVcc_64(c, t, txaddy[2]);
-	
-	t = tysubx[3];
-	tysubx[3] = #CMOVcc_64(c, txaddy[3], tysubx[3]);
-	txaddy[3] = #CMOVcc_64(c, t, txaddy[3]);
-
-	temp = txaddy[0];
-	old_y[0] = txaddy[1];
-	old_y[1] = txaddy[2];
-	old_y[2] = txaddy[3];
-	
-	cf, txaddy[0] -= tysubx[0];
-	cf, txaddy[1] -= tysubx[1] - cf;
-	cf, txaddy[2] -= tysubx[2] - cf;
-	cf, txaddy[3] -= tysubx[3] - cf;
-
-	subt0 = 0;
-	subt1 = 38;
-	subt1 = #CMOVcc_64(!cf, subt0, subt1);
-	
-	cf, txaddy[0] -= subt1;
-	cf, txaddy[1] -= subt0 - cf;
-	cf, txaddy[2] -= subt0 - cf;
-	cf, txaddy[3] -= subt0 - cf;
-	
-	subt0 = #CMOVcc_64(cf, subt1, subt0);
-	txaddy[0] -= subt0;
-
-	r[0] = txaddy[0];
-	r[1] = txaddy[1];
-	r[2] = txaddy[2];
-	r[3] = txaddy[3];
-	r[4] = 0;
-	
-	cf, tysubx[0] += temp;
-	cf, tysubx[1] += old_y[0] + cf;
-	cf, tysubx[2] += old_y[1] + cf;
-	cf, tysubx[3] += old_y[2] + cf;
-	
-	subt0 = 0;
-	subt1 = 38;
-	subt1 = #CMOVcc_64(!cf, subt0, subt1);
-	
-	cf, tysubx[0] += subt1;
-	cf, tysubx[1] += subt0 + cf;
-	cf, tysubx[2] += subt0 + cf;
-	cf, tysubx[3] += subt0 + cf;
-	
-	subt0 = #CMOVcc_64(cf, subt1, subt0);
-	tysubx[0] += subt0;
-
-	r[5] = tysubx[0];
-	r[6] = tysubx[1];
-	r[7] = tysubx[2];
-	r[8] = tysubx[3];
-	r[9] = 0;
-	
-	tt2d[0] = 0;
-	tt2d[1] = 0;
-	tt2d[2] = 0;
-	tt2d[3] = 0;
-	
-	?{"==" = c} = #CMP(u,1);
-	
-	t = _basep[(int)pos + 8];
-	tt2d[0] = #CMOVcc_64(c, t, tt2d[0]);
-	t = _basep[(int)pos + 9];
-	tt2d[1] = #CMOVcc_64(c, t, tt2d[1]);
-	t = _basep[(int)pos + 10];
-	tt2d[2] = #CMOVcc_64(c, t, tt2d[2]);
-	t = _basep[(int)pos + 11];
-	tt2d[3] = #CMOVcc_64(c, t, tt2d[3]);
-	
-	?{"==" = c} = #CMP(u,2);
-	
-	t = _basep[(int)pos + 20];
-	tt2d[0] = #CMOVcc_64(c, t, tt2d[0]);
-	t = _basep[(int)pos + 21];
-	tt2d[1] = #CMOVcc_64(c, t, tt2d[1]);
-	t = _basep[(int)pos + 22];
-	tt2d[2] = #CMOVcc_64(c, t, tt2d[2]);
-	t = _basep[(int)pos + 23];
-	tt2d[3] = #CMOVcc_64(c, t, tt2d[3]);
-	
-	?{"==" = c} = #CMP(u,3);
-	
-	t = _basep[(int)pos + 32];
-	tt2d[0] = #CMOVcc_64(c, t, tt2d[0]);
-	t = _basep[(int)pos + 33];
-	tt2d[1] = #CMOVcc_64(c, t, tt2d[1]);
-	t = _basep[(int)pos + 34];
-	tt2d[2] = #CMOVcc_64(c, t, tt2d[2]);
-	t = _basep[(int)pos + 35];
-	tt2d[3] = #CMOVcc_64(c, t, tt2d[3]);
-
-	?{"==" = c} = #CMP(u,4);
-	
-	t = _basep[(int)pos + 44];
-	tt2d[0] = #CMOVcc_64(c, t, tt2d[0]);
-	t = _basep[(int)pos + 45];
-	tt2d[1] = #CMOVcc_64(c, t, tt2d[1]);
-	t = _basep[(int)pos + 46];
-	tt2d[2] = #CMOVcc_64(c, t, tt2d[2]);
-	t = _basep[(int)pos + 47];
-	tt2d[3] = #CMOVcc_64(c, t, tt2d[3]);
-	
-	?{"==" = c} = #CMP(u,5);
-	
-	t = _basep[(int)pos + 56];
-	tt2d[0] = #CMOVcc_64(c, t, tt2d[0]);
-	t = _basep[(int)pos + 57];
-	tt2d[1] = #CMOVcc_64(c, t, tt2d[1]);
-	t = _basep[(int)pos + 58];
-	tt2d[2] = #CMOVcc_64(c, t, tt2d[2]);
-	t = _basep[(int)pos + 59];
-	tt2d[3] = #CMOVcc_64(c, t, tt2d[3]);
-
-	?{"==" = c} = #CMP(u,6);
-	
-	t = _basep[(int)pos + 68];
-	tt2d[0] = #CMOVcc_64(c, t, tt2d[0]);
-	t = _basep[(int)pos + 69];
-	tt2d[1] = #CMOVcc_64(c, t, tt2d[1]);
-	t = _basep[(int)pos + 70];
-	tt2d[2] = #CMOVcc_64(c, t, tt2d[2]);
-	t = _basep[(int)pos + 71];
-	tt2d[3] = #CMOVcc_64(c, t, tt2d[3]);
-
-	?{"==" = c} = #CMP(u,7);
-	
-	t = _basep[(int)pos + 80];
-	tt2d[0] = #CMOVcc_64(c, t, tt2d[0]);
-	t = _basep[(int)pos + 81];
-	tt2d[1] = #CMOVcc_64(c, t, tt2d[1]);
-	t = _basep[(int)pos + 82];
-	tt2d[2] = #CMOVcc_64(c, t, tt2d[2]);
-	t = _basep[(int)pos + 83];
-	tt2d[3] = #CMOVcc_64(c, t, tt2d[3]);
-
-	?{"==" = c} = #CMP(u,8);
-	
-	t = _basep[(int)pos + 92];
-	tt2d[0] = #CMOVcc_64(c, t, tt2d[0]);
-	t = _basep[(int)pos + 93];
-	tt2d[1] = #CMOVcc_64(c, t, tt2d[1]);
-	t = _basep[(int)pos + 94];
-	tt2d[2] = #CMOVcc_64(c, t, tt2d[2]);
-	t = _basep[(int)pos + 95];
-	tt2d[3] = #CMOVcc_64(c, t, tt2d[3]);
+	tt2ds[u256 0] = tt2d;
 	
 	tt[0] = 0;
 	tt[1] = 0;
 	tt[2] = 0;
 	tt[3] = 0;
 	
-	cf, tt[0] -= tt2d[0];
-	cf, tt[1] -= tt2d[1] - cf;
-	cf, tt[2] -= tt2d[2] - cf;
-	cf, tt[3] -= tt2d[3] - cf;
+	cf, tt[0] -= tt2ds[0];
+	cf, tt[1] -= tt2ds[1] - cf;
+	cf, tt[2] -= tt2ds[2] - cf;
+	cf, tt[3] -= tt2ds[3] - cf;
 
 	subt0 = 0;
 	subt1 = 38;
@@ -367,16 +113,64 @@ inline fn init_r(reg u64 b) -> stack u64[19]
 
 	tt[0] -= subt0;
 	
-	?{"<s" = c} = #CMP(b,0);
-	tt2d[0] = #CMOVcc_64(c, tt[0], tt2d[0]);
-	tt2d[1] = #CMOVcc_64(c, tt[1], tt2d[1]);
-	tt2d[2] = #CMOVcc_64(c, tt[2], tt2d[2]);
-	tt2d[3] = #CMOVcc_64(c, tt[3], tt2d[3]);
+	tts = #copy(tt);
+	tt_256 = tts[u256 0];
+	tt2d = #VPBLENDVB_256(tt2d, tt_256, b_256);
+	tt2ds[u256 0] = tt2d;
 	
-	r[15] = tt2d[0];
-	r[16] = tt2d[1];
-	r[17] = tt2d[2];
-	r[18] = tt2d[3];
+	txaddyr = #copy(txaddys);
+	tysubxr = #copy(tysubxs);
+	
+	cf, txaddyr[0] -= tysubxr[0];
+	cf, txaddyr[1] -= tysubxr[1] - cf;
+	cf, txaddyr[2] -= tysubxr[2] - cf;
+	cf, txaddyr[3] -= tysubxr[3] - cf;
+
+	subt0 = 0;
+	subt1 = 38;
+	subt1 = #CMOVcc_64(!cf, subt0, subt1);
+	
+	cf, txaddyr[0] -= subt1;
+	cf, txaddyr[1] -= subt0 - cf;
+	cf, txaddyr[2] -= subt0 - cf;
+	cf, txaddyr[3] -= subt0 - cf;
+	
+	subt0 = #CMOVcc_64(cf, subt1, subt0);
+	txaddyr[0] -= subt0;
+
+	r[0] = txaddyr[0];
+	r[1] = txaddyr[1];
+	r[2] = txaddyr[2];
+	r[3] = txaddyr[3];
+	r[4] = 0;
+	
+	cf, tysubxr[0] += old_y[0];
+	cf, tysubxr[1] += old_y[1] + cf;
+	cf, tysubxr[2] += old_y[2] + cf;
+	cf, tysubxr[3] += old_y[3] + cf;
+	
+	subt0 = 0;
+	subt1 = 38;
+	subt1 = #CMOVcc_64(!cf, subt0, subt1);
+	
+	cf, tysubxr[0] += subt1;
+	cf, tysubxr[1] += subt0 + cf;
+	cf, tysubxr[2] += subt0 + cf;
+	cf, tysubxr[3] += subt0 + cf;
+	
+	subt0 = #CMOVcc_64(cf, subt1, subt0);
+	tysubxr[0] += subt0;
+
+	r[5] = tysubxr[0];
+	r[6] = tysubxr[1];
+	r[7] = tysubxr[2];
+	r[8] = tysubxr[3];
+	r[9] = 0;
+	
+	r[15] = tt2ds[0];
+	r[16] = tt2ds[1];
+	r[17] = tt2ds[2];
+	r[18] = tt2ds[3];
 	
 	r[10] = 2;
   r[11] = 0;
