@@ -6,8 +6,8 @@ require "sqr4.jinc"
 
 fn ge25519_dbl_p1p1(reg ptr u64[16] r, reg ptr u64[12] p) -> reg ptr u64[16]
 {
-	reg u64[4] a b c d e t0;
-	reg u64[4] rx ry rz rt;
+	reg u64[4] a b c d e;
+	reg u64[4] rx rz;
 	stack u64[4] as bs cs ds es rxs;
 	reg u64 z;
 	reg bool cf;

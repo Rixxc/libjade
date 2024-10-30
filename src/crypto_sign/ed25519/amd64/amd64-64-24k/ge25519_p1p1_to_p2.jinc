@@ -3,7 +3,7 @@ require "mul4.jinc"
 fn ge25519_p1p1_to_p2(reg ptr u64[12] r, reg ptr u64[16] p) -> reg ptr u64[12]
 {
 	reg u64[4] a b c d;
-	reg u64[4] rx ry rz rt;
+	reg u64[4] rx ry rz;
 	stack u64[4] as bs;
 	
 	a[0] = p[0];

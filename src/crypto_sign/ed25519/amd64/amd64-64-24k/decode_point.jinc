@@ -24,12 +24,7 @@ inline fn __decode_point(stack u64[4] y d ps) -> stack u64[4], stack u64[4], sta
 	}
   y = #copy(ys);
   
-  // Establish constants and write them to the stack
-  /*p[0] = 0xffffffffffffffed;
-  p[1] = 0xffffffffffffffff;
-  p[2] = 0xffffffffffffffff;
-  p[3] = 0x7fffffffffffffff;*/
-  
+  // Establish constant and write them to the stack  
   sqrt_m1[0] = 0xc4ee1b274a0ea0b0;
   sqrt_m1[1] = 0x2f431806ad2fe478;
   sqrt_m1[2] = 0x2b4d00993dfbd7a7;
@@ -92,7 +87,7 @@ inline fn __decode_point(stack u64[4] y d ps) -> stack u64[4], stack u64[4], sta
     valid = 0;
   }
   
-  x = __reduce_p4(x, ps);
+  x = __reduce_p4(x);
   
   sign = signs;
   
@@ -104,7 +99,7 @@ inline fn __decode_point(stack u64[4] y d ps) -> stack u64[4], stack u64[4], sta
   }
   
   t = __mul4_sss(x, y);
-  t = __reduce_p4(t, ps);
+  t = __reduce_p4(t);
   
   ?{}, z = #set0();
   z3[0] = 1;

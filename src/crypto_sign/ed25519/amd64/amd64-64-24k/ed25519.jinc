@@ -1,24 +1,26 @@
 from Jade require "crypto_sign/ed25519/amd64/common/load_store4.jinc"
 
+u64[4] L = {0x5812631A5CF5D3ED, 0x14DEF9DEA2F79CD6, 0x0000000000000000, 0x1000000000000000};
+
 require "sha512_api.jinc"
 require "curve25519.jinc"
-require "reduce_q4.jinc"
-require "muladdq4.jinc"
+require "sc25519_barrett.jinc"
+require "sc25519_add.jinc"
+require "sc25519_mul.jinc"
 
 export fn jade_ed25519_amd64_keygen(reg u64 skp pkp) -> reg u64
 {
   reg u64[4] sk pk h_red;
   stack u64[4] sks ks;
-  reg u64 inlen r temp_64;
-  stack u64 skps pkps;
-  inline int i;
   
+  stack u64 skps pkps;
   stack u64[8] H;
   reg ptr u64[8] Hreg;
   stack ptr u64[8] Hregs;
   reg u64[8] h;
   stack u64[25] state;
   reg ptr u64[25] pstate;
+  reg u64 flag num_bytes r;
   
   skps = skp;
   pkps = pkp;
@@ -26,11 +28,10 @@ export fn jade_ed25519_amd64_keygen(reg u64 skp pkp) -> reg u64
   Hreg = H;
 	Hregs = Hreg;
 	
-  reg u64 flag num_bytes;
-  while {
-    flag = 0;
-    sks, num_bytes = #randombytes(sks, flag);
-  } (num_bytes != 32)
+	while {
+		flag = 0;
+		sks, num_bytes = #randombytes(sks, flag);
+	} (num_bytes != 32)
 	sk = #copy(sks);
   
   skp = skps;
@@ -73,7 +74,7 @@ export fn jade_ed25519_amd64_keygen(reg u64 skp pkp) -> reg u64
 export fn jade_ed25519_amd64_sign(reg u64 skp mp msg_len sigp) -> reg u64
 {
   inline int i;
-  reg u64[4] k s temp h_red R input;
+  reg u64[4] s h_red R input scs;
   stack u64[4] rs ks;
   stack u64 msg_lens mps sigps;
   
@@ -84,7 +85,7 @@ export fn jade_ed25519_amd64_sign(reg u64 skp mp msg_len sigp) -> reg u64
   stack u64[8] hs;
   stack u64[25] state state_2;
 	reg ptr u64[25] pstate pstate_2;
-	reg u64 inlen r;
+	reg u64 r;
 	
 	msg_lens = msg_len;
 	mps = mp;
@@ -147,10 +148,10 @@ export fn jade_ed25519_amd64_sign(reg u64 skp mp msg_len sigp) -> reg u64
 	pstate = state;
 	Hreg = sha512_finalize(pstate, Hreg);
 	H = Hreg;
-	h = #copy(H);
+	hs = #copy(H);
 	Hregs = Hreg;
   
-  h_red = __reduce_q4(h);
+  h_red = sc25519_barrett(hs);
   rs = #copy(h_red);
   R = __curve25519_mulx_base(h_red);
   
@@ -176,14 +177,16 @@ export fn jade_ed25519_amd64_sign(reg u64 skp mp msg_len sigp) -> reg u64
 	pstate_2 = state_2;
 	Hreg = sha512_finalize(pstate_2, Hreg);
 	H = Hreg;
-	h = #copy(H);
+	hs = #copy(H);
   Hregs = Hreg;
   
-  h_red = __reduce_q4(h);
+  h_red = sc25519_barrett(hs);
 	
-	k = #copy(ks);
-	temp = #copy(rs);
-  s = __muladd_q4(k, h_red, temp);
+	// k = #copy(ks);
+	// temp = #copy(rs);
+	scs = sc25519_mul_rsr(ks, h_red);
+	s = sc25519_add_rrs(scs, rs);
+  // s = __muladd_q4(k, h_red, temp);
 	
 	sigp = sigps;
   __store4(sigp, s);
@@ -195,7 +198,7 @@ export fn jade_ed25519_amd64_sign(reg u64 skp mp msg_len sigp) -> reg u64
 export fn jade_ed25519_amd64_verify(reg u64 sigp pkp mp msg_len) -> reg u64
 {
   reg u64 [4] B R s A h_red;
-  reg u64[4] s_enc r_enc p d;
+  reg u64[4] s_enc r_enc local_p d;
   stack u64[4] xb yb zb tb xr yr zr tr xabc yabc zabc;
   stack u64[4] Rs As Bs s_encs ps ds;
   stack u8 valid;
@@ -204,10 +207,10 @@ export fn jade_ed25519_amd64_verify(reg u64 sigp pkp mp msg_len) -> reg u64
   stack u64[8] H;
   reg ptr u64[8] Hreg;
   stack ptr u64[8] Hregs;
-  reg u64[8] h;
+  stack u64[8] hs;
   stack u64[25] state;
   reg ptr u64[25] pstate;
-  reg u64 inlen input vrfy_res temp_64;
+  reg u64 vrfy_res temp_64;
   
   inline int i;
   
@@ -230,11 +233,11 @@ export fn jade_ed25519_amd64_verify(reg u64 sigp pkp mp msg_len) -> reg u64
   d[3] = 0x52036cee2b6ffe73;
   ds = #copy(d);
   
-  p[0] = 0xffffffffffffffed;
-  p[1] = 0xffffffffffffffff;
-  p[2] = 0xffffffffffffffff;
-  p[3] = 0x7fffffffffffffff;
-  ps = #copy(p);
+  local_p[0] = 0xffffffffffffffed;
+  local_p[1] = 0xffffffffffffffff;
+  local_p[2] = 0xffffffffffffffff;
+  local_p[3] = 0x7fffffffffffffff;
+  ps = #copy(local_p);
   
   pstate = state;
 	pstate = sha512_init(pstate);
@@ -262,10 +265,10 @@ export fn jade_ed25519_amd64_verify(reg u64 sigp pkp mp msg_len) -> reg u64
 	pstate = state;
 	Hreg = sha512_finalize(pstate, Hreg);
 	H = Hreg;
-	h = #copy(H);
+	hs = #copy(H);
   Hregs = Hreg;
   
-  h_red = __reduce_q4(h);
+  h_red = sc25519_barrett(hs);
   for i=0 to 4{
   	temp_64 = As[i];
   	temp_64 = #BSWAP_64(temp_64);
@@ -295,7 +298,7 @@ export fn jade_ed25519_amd64_verify(reg u64 sigp pkp mp msg_len) -> reg u64
   xr, yr, zr, tr, valid = __decode_point(Rs, ds, ps);
   _, _, _, _, xabc, yabc, zabc, _ = __add_and_double4(xr, yr, zr, tr, xb, yb, zb, tb, ds);
   
-  r_enc = __encode_point(xabc, yabc, zabc, ps);
+  r_enc = __encode_point(xabc, yabc, zabc);
   
   B = #copy(Bs);
 	valid = __cmp4_rr(r_enc, B);

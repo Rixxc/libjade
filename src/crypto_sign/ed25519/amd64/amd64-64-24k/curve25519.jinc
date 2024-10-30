@@ -1,8 +1,12 @@
 from Jade require "crypto_sign/ed25519/amd64/common/bit.jinc"
-from Jade require "crypto_sign/ed25519/amd64/common/decode_scalar.jinc"
-
-from Jade require "crypto_sign/ed25519/amd64/common/64/decode_u4.jinc"
 from Jade require "crypto_sign/ed25519/amd64/common/64/init_points4.jinc"
+
+u64 mask63 = 0x7FFFFFFFFFFFFFFF;
+u64[4] p = {0xffffffffffffffed, 0xffffffffffffffff, 0xffffffffffffffff, 0x7fffffffffffffff};
+
+
+from Jade require "crypto_sign/ed25519/amd64/common/decode_scalar.jinc"
+from Jade require "crypto_sign/ed25519/amd64/common/64/decode_u4.jinc"
 from Jade require "crypto_sign/ed25519/amd64/common/64/add4.jinc"
 from Jade require "crypto_sign/ed25519/amd64/common/64/sub4.jinc"
 from Jade require "crypto_sign/ed25519/amd64/common/64/cswap4.jinc"
@@ -11,11 +15,11 @@ require "mul4.jinc"
 require "sqr4.jinc"
 require "ge.jinc"
 require "invert4.jinc"
-
+require "fe25519_cmov.jinc"
+require "fe25519_freeze.jinc"
+require "sc25519_from32bytes.jinc"
 require "decode_point.jinc"
 require "encode_point.jinc"
-
-u64[4] p = {0xffffffffffffffed, 0xffffffffffffffff, 0xffffffffffffffff, 0x7fffffffffffffff};
 
 inline fn __add_and_double4(
   stack u64[4] x1,
@@ -40,10 +44,8 @@ inline fn __add_and_double4(
   stack u64[4] x3 y3 z3 t3 x4 y4 z4 t4;
   stack u64[4] x1s y1s z1s;
   stack u64[4] a b c d2 e f g h;
-  reg u64[4] x1r x2r ar;
   
   x1s = #copy(x1);
-  // x2r = #copy(x2);
   y1s = #copy(y1);
   z1s = #copy(z1);
     
@@ -146,7 +148,6 @@ inline fn __montgomery_ladder4(
   stack u64[4]
 {
   stack u64[4] x2 y2 z2 t2;
-  reg u64[4] d;
   stack u64 ctrs swapped;
   reg u64 ctr;
   
@@ -178,7 +179,7 @@ inline fn __curve25519_internal_mulx(stack u64[4] x3 y3 z3 t3 ds, stack u8[32] k
   reg u64[4] r;
   
   (x2, y2, z2) = __montgomery_ladder4(k, ds, x3, y3, z3, t3);
-  r = __encode_point(x2, y2, z2, p);
+  r = __encode_point(x2, y2, z2);
   
   return r;
 }
@@ -210,24 +211,62 @@ fn _curve25519_mulx_base(reg u64 k0 k1 k2 k3) -> reg u64, reg u64, reg u64, reg 
 	stack u64[16] ger;
 	reg ptr u64[16] gerp;
 	reg u64[4] _k r;
-	stack u64[4] rx ry rz;
+	stack u64[4] rxs rys rzs;
+	reg u64[4] ZplusY ZminusY rx ry rz;
 	reg u64 r0 r1 r2 r3;
+	reg u64 temp par wantmont;
+	stack u64 wantmonts;
 	
 	_k[0] = k0;
   _k[1] = k1;
   _k[2] = k2;
   _k[3] = k3;
   
+  _k = sc25519_from32bytes(_k);
+  wantmont = _k[3];
+  wantmont = wantmont >> 63;
+  wantmonts = wantmont;
+  _k[3] &= mask63;
+  
   gerp = ger;
   gerp = __ge25519_scalarmult_base(gerp, _k);
 	ger = gerp;
+
+	ry[0] = ger[4];
+	ry[1] = ger[5];
+	ry[2] = ger[6];
+	ry[3] = ger[7];
 	
-	rx = ger[0:4];
-	ry = ger[4:4];
-	rz = ger[8:4];
+	ZplusY = __add4_rsr(ger[8:4], ry);
+	ZminusY = __sub4_rsr(ger[8:4], ry);
+	rys = __cmov4_ssrs(ger[4:4], ZplusY, wantmonts);
+	rz = __cmov4_rsrs(ger[8:4], ZminusY, wantmonts);
 	
-	r = __encode_point(rx, ry, rz, p);
+	rz = __fe25519_pack(rz);
+	rz[3] &= mask63;
+	rz = __crypto_pow(rz);
+	rz[3] &= mask63;
+  
+	rzs = #copy(rz);
 	
+	rys = __mul4_ssr(rys, rz);
+	
+	rx = __mul4_rss(ger[0:4], rzs);
+  rxs = __freeze4_sr(rx);
+  
+	ry = #copy(rys);
+	r = __fe25519_pack(ry);
+  
+  par = rxs[u64 0];
+  par &= 0x1;
+  
+  temp = 1;
+  temp -= wantmonts;
+  
+  par &= temp;
+  par = par << 63;
+  r[3] ^= par;
+  
 	r0 = r[0];
 	r1 = r[1];
 	r2 = r[2];

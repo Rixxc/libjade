@@ -1,10 +1,7 @@
 from Jade require "crypto_sign/ed25519/amd64/common/64/cmp4.jinc"
 from Jade require "crypto_sign/ed25519/amd64/common/64/sub4.jinc"
 
-inline fn __reduce_p4
-( stack u64[4] a,
-  stack u64[4] p
-) -> stack u64[4]
+inline fn __reduce_p4( stack u64[4] a) -> stack u64[4]
 {
   reg u8 temp_8;
   reg u64 temp_64;

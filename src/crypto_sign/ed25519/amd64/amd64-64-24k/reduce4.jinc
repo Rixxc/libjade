@@ -27,18 +27,14 @@ inline fn __reduce4
   cf, r[0]     = #ADCX ( r[0], z, cf ); 
   of, r[0]     = #ADOX ( r[0], z, of );
 
-  //
-  _,_,_,_,_,lo = #IMULri ( r[0], 38 );
+	?{}, r[0] = #SHLD(r[0], h[3], 1);
+	h[3] &= mask63;
 
-  cf, h[0] += lo;
-  cf, h[1] += z + cf;
-  cf, h[2] += z + cf;
-  cf, h[3] += z + cf;
-
-  // h[0] += (z - cf) & 38;
-  _, z -= z - cf; // if cf = 1 then z = 0xFF..FF else z = 0
-  z &= 38; // if cf = 1 then z = 38 else z = 0
-  h[0] += z; // 
+	_,_,_,_,_,r[0] = #IMULri ( r[0], 19 );
+	cf, h[0] += r[0];
+	cf, h[1] += z + cf;
+	cf, h[2] += z + cf;
+	cf, h[3] += z + cf;
 
   return h;
 }

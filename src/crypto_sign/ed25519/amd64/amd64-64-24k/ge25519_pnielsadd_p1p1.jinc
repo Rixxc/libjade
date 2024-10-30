@@ -4,8 +4,8 @@ require "mul4.jinc"
 
 fn ge25519_pnielsadd_p1p1(reg ptr u64[16] rp pp qp) -> reg ptr u64[16]
 {
-	reg u64[4] a b c d e f g h q r;
-	stack u64[4] as bs cs ds es fs gs hs qs;
+	reg u64[4] a b c q r;
+	stack u64[4] as bs cs qs;
 	reg u64[4] rx ry rz rt;
 	reg u64 z;
 	reg bool cf;

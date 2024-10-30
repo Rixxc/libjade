@@ -1,17 +1,18 @@
 require "ge25519_base_niels.jinc"
 
-inline fn choose_t(reg u64 pos, reg u64 b) -> stack u64[12]
+inline fn init_r(reg u64 b) -> stack u64[19]
 {	
 	reg ptr u64[6144] _basep;
-	stack u64[12] t_stack;
+	stack u64[19] r;
 	reg bool c cf;
-	reg u64 mask u t;
+	reg u64 mask pos u t;
 	reg u64[4] tysubx txaddy tt2d tt;
-	reg u64 subt0 subt1;
+	reg u64 subt0 subt1 temp;
+	stack u64[3] old_y;
 	
 	_basep = basep;
 	
-	pos *= 96;
+	pos = 0;
 	
 	mask = b;
 	mask >>s= 7;
@@ -198,17 +199,58 @@ inline fn choose_t(reg u64 pos, reg u64 b) -> stack u64[12]
 	t = tysubx[3];
 	tysubx[3] = #CMOVcc_64(c, txaddy[3], tysubx[3]);
 	txaddy[3] = #CMOVcc_64(c, t, txaddy[3]);
+
+	temp = txaddy[0];
+	old_y[0] = txaddy[1];
+	old_y[1] = txaddy[2];
+	old_y[2] = txaddy[3];
 	
-	t_stack[0] = tysubx[0];
-	t_stack[1] = tysubx[1];
-	t_stack[2] = tysubx[2];
-	t_stack[3] = tysubx[3];
+	cf, txaddy[0] -= tysubx[0];
+	cf, txaddy[1] -= tysubx[1] - cf;
+	cf, txaddy[2] -= tysubx[2] - cf;
+	cf, txaddy[3] -= tysubx[3] - cf;
 
-	t_stack[4] = txaddy[0];
-	t_stack[5] = txaddy[1];
-	t_stack[6] = txaddy[2];
-	t_stack[7] = txaddy[3];
+	subt0 = 0;
+	subt1 = 38;
+	subt1 = #CMOVcc_64(!cf, subt0, subt1);
+	
+	cf, txaddy[0] -= subt1;
+	cf, txaddy[1] -= subt0 - cf;
+	cf, txaddy[2] -= subt0 - cf;
+	cf, txaddy[3] -= subt0 - cf;
+	
+	subt0 = #CMOVcc_64(cf, subt1, subt0);
+	txaddy[0] -= subt0;
 
+	r[0] = txaddy[0];
+	r[1] = txaddy[1];
+	r[2] = txaddy[2];
+	r[3] = txaddy[3];
+	r[4] = 0;
+	
+	cf, tysubx[0] += temp;
+	cf, tysubx[1] += old_y[0] + cf;
+	cf, tysubx[2] += old_y[1] + cf;
+	cf, tysubx[3] += old_y[2] + cf;
+	
+	subt0 = 0;
+	subt1 = 38;
+	subt1 = #CMOVcc_64(!cf, subt0, subt1);
+	
+	cf, tysubx[0] += subt1;
+	cf, tysubx[1] += subt0 + cf;
+	cf, tysubx[2] += subt0 + cf;
+	cf, tysubx[3] += subt0 + cf;
+	
+	subt0 = #CMOVcc_64(cf, subt1, subt0);
+	tysubx[0] += subt0;
+
+	r[5] = tysubx[0];
+	r[6] = tysubx[1];
+	r[7] = tysubx[2];
+	r[8] = tysubx[3];
+	r[9] = 0;
+	
 	tt2d[0] = 0;
 	tt2d[1] = 0;
 	tt2d[2] = 0;
@@ -330,11 +372,17 @@ inline fn choose_t(reg u64 pos, reg u64 b) -> stack u64[12]
 	tt2d[1] = #CMOVcc_64(c, tt[1], tt2d[1]);
 	tt2d[2] = #CMOVcc_64(c, tt[2], tt2d[2]);
 	tt2d[3] = #CMOVcc_64(c, tt[3], tt2d[3]);
+	
+	r[15] = tt2d[0];
+	r[16] = tt2d[1];
+	r[17] = tt2d[2];
+	r[18] = tt2d[3];
+	
+	r[10] = 2;
+  r[11] = 0;
+  r[12] = 0;
+  r[13] = 0;
+  r[14] = 0;
 
-	t_stack[8] = tt2d[0];
-	t_stack[9] = tt2d[1];
-	t_stack[10] = tt2d[2];
-	t_stack[11] = tt2d[3];
-
-	return t_stack;
+	return r;
 }

@@ -312,7 +312,7 @@ fn sha512_update_block(reg ptr u64[25] pstate, reg ptr u64[16] m) -> reg ptr u64
 fn sha512_update_ext(reg ptr u64[25] pstate, reg u64 m, reg u64 inlen) -> reg ptr u64[25]
 {
 	reg u64 mod_len total_len iterations;
-	reg u64 i j aux;	
+	reg u64 i j;	
 	stack u64 total_s inlen_s iter_s i_s j_s m_s;
 
 	m_s = m;
@@ -371,7 +371,7 @@ fn sha512_update_ext(reg ptr u64[25] pstate, reg u64 m, reg u64 inlen) -> reg pt
 fn sha512_update_ext_align(reg ptr u64[25] pstate, reg u64 m, reg u64 inlen) -> reg ptr u64[25]
 {
 	reg u64 mod_len total_len iterations;
-	reg u64 i j aux;	
+	reg u64 i j;	
 	stack u64 total_s inlen_s iter_s i_s j_s m_s;
 
 	m_s = m;
