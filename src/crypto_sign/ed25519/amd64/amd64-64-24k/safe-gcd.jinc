@@ -2,16 +2,15 @@ require "gcd_table.jinc"
 
 inline fn __reduce_x(reg u64[4] a_in) -> reg u64[4]
 {
-	reg u64 t0 mask;
+	reg u64 t0;
 	reg bool cf;
 	inline int i;
 	
 	// t = MSB(a) * 64
 	t0 = a_in[3];
 	t0 = t0 >>s 63;
-	mask = 0x7fffffffffffffff;
 	// a = abs(a)
-	a_in[3] &= mask;
+	a_in[3] &= mask63;
 	
 	// Reduce below p
 	t0 &= 19;
@@ -25,7 +24,7 @@ inline fn __reduce_x(reg u64[4] a_in) -> reg u64[4]
 	
 	t0 = a_in[3];
 	t0 = t0 >>s 63;
-	a_in[3] &= mask;
+	a_in[3] &= mask63;
 	
 	t0 &= 19;
 	
@@ -135,34 +134,32 @@ inline fn divstep(reg u64 grs fuv m z) -> reg u64, reg u64, reg u64
 	return grs, fuv, m;
 }
 
-fn _crypto_pow(reg u64 x0 x1 x2 x3) -> reg u64, reg u64, reg u64, reg u64
+fn __crypto_pow(reg u64[4] x, #msf reg u64 msf) -> reg u64 [4], #msf reg u64
 {
-	reg u64[4] t a x y;
 	reg u64 a4 a5 a6 y0 y1 y2 y3;
 	reg u64 f f0 g g0 h i m mnew r s u v z;
 	reg u64 fuv grs oldg;
-	reg u64 rax rdx mask;
+	reg u64 rax rdx;
 	reg u64 rtimesoldv stimesolds;
 	reg u64 _m2p62 _2p20 _m2p41 _m2p20 _2p20a2p41;
-	stack u64 _m2p62s _2p20s _m2p41s _m2p20s _2p20a2p41s;
-	stack u64[2] m1s;
-	reg u128 vvrr_128 uuss_128;
+	reg u64[4] a t y;
+	reg u128 uuss_128 vvrr_128;
 	reg u256 carryy carryz vvrr vvrr0 vvrr1 uuss uuss0 uuss1 ta tb out8plus2;
-	reg u256[10] outplus;
-	reg u256[11] out;
 	reg u256 d0 d1 d0x19 d1x19;
 	reg u256 _19x4 _0_19x4 _32767x4 _inv19_2p30x4 _2p30m1x4 _2p33x4 _2p48x4 _2p63x4 _2p63m2p33x4;
+	reg u256[9] FVGS GSFV;
+	reg u256[10] outplus;
+	reg u256[11] out;
+	stack u64 _m2p62s _2p20s _m2p41s _m2p20s _2p20a2p41s;
+	stack u64[2] m1s;
 	stack u256 _19x4s _0_19x4s _32767x4s _inv19_2p30x4s _2p30m1x4s _2p33x4s _2p48x4s _2p63x4s;
 	stack u256[1] vvrrs uusss fxgxs fygys;
 	stack u256[9] stack_FVGS;
-	reg u256[9] FVGS GSFV;
-	reg bool cf e l;
+	reg bool cf e l cond;
 	inline int j k;
+	#mmx reg u64 msf_s;
 	
-	x[0] = x0;
-	x[1] = x1;
-	x[2] = x2;
-	x[3] = x3;
+	msf_s = #mov_msf(msf);
 	
 	a = #copy(x);
 	a = __reduce_x(a);
@@ -249,9 +246,16 @@ fn _crypto_pow(reg u64 x0 x1 x2 x3) -> reg u64, reg u64, reg u64, reg u64
 	
 	f0 = 0;
 	g0 = 0;
-	while(i != 0){
+	
+	
+	
+	// Protect here
+	while{cond = (i != 0); msf = #mov_msf(msf_s);}(cond){
 		// Compute g*((s<<128)+v) + f*((r<<128)+u)
 		// f = Bits 60 to 124, g=t[2] = Bits 128 + 60 to 128+124
+    msf = #update_msf(cond, msf);
+    msf_s = #mov_msf(msf);
+		
 		rax = g;
 		_, _, _, _, _, rdx, rax = #IMUL(rax, s);
 		
@@ -982,7 +986,8 @@ fn _crypto_pow(reg u64 x0 x1 x2 x3) -> reg u64, reg u64, reg u64, reg u64
 		
 		i -= 1;
 	}
-	
+  msf = #update_msf(!cond, msf);
+  msf_s = #mov_msf(msf);
 	
 	
 	f0 <<= 60;
@@ -1111,8 +1116,7 @@ fn _crypto_pow(reg u64 x0 x1 x2 x3) -> reg u64, reg u64, reg u64, reg u64
 	
 	cf = #BT(y[3], 63);
 	_, a4 += a4 + cf;
-	mask = 0x7fffffffffffffff;
-	y[3] &= mask;
+	y[3] &= mask63;
 	
 	h = a4;
 	rax = 19;
@@ -1128,8 +1132,7 @@ fn _crypto_pow(reg u64 x0 x1 x2 x3) -> reg u64, reg u64, reg u64, reg u64
 	
 	cf = #BT(y[3], 63);
 	_, a4 += a4 + cf;
-	mask = 0x7fffffffffffffff;
-	y[3] &= mask;
+	y[3] &= mask63;
 	
 	h = a4;
 	rax = 19;
@@ -1164,8 +1167,7 @@ fn _crypto_pow(reg u64 x0 x1 x2 x3) -> reg u64, reg u64, reg u64, reg u64
 	t[0] = y[3];
 	t[0] = t[0] >>s 63;
 	
-	mask = 0x7fffffffffffffff;
-	y[3] &= mask;
+	y[3] &= mask63;
 	
 	t[0] &= 19;
 	cf, y[0] += t[0];
@@ -1183,23 +1185,7 @@ fn _crypto_pow(reg u64 x0 x1 x2 x3) -> reg u64, reg u64, reg u64, reg u64
 	y2 = y[2];
 	y3 = y[3];
 	
-	return y0, y1, y2, y3;
-}
-
-inline fn __crypto_pow(reg u64[4] x) -> reg u64[4]
-{
-	reg u64[4] y;
-	reg u64 x0 x1 x2 x3;
-	reg u64 y0 y1 y2 y3;
-	x0 = x[0];
-	x1 = x[1];
-	x2 = x[2];
-	x3 = x[3];
-	y0, y1, y2, y3 = _crypto_pow(x0, x1, x2, x3);
-	y[0] = y0;
-	y[1] = y1;
-	y[2] = y2;
-	y[3] = y3;
+	msf = #mov_msf(msf_s);
 	
-	return y;
+	return y, msf;
 }

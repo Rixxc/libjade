@@ -1,22 +1,14 @@
-require "invert4.jinc"
 require "safe-gcd.jinc"
 require "fe25519_pack.jinc"
 
-inline fn __encode_point(stack u64[4] x y z) -> reg u64[4]
+inline fn __encode_point(stack u64[4] x y z, #msf reg u64 msf) -> reg u64[4], #msf reg u64
 {
   reg u8 temp;
   reg u64[4] zr res;
   
   zr = #copy(z);
-  /*// Pack
-  zr = __fe25519_pack(zr);
-	mask = 0x7fffffffffffffff;
-	zr[3] &= mask;
-	zr2 = __crypto_pow(zr);
-	mask = 0x7fffffffffffffff;
-	zr2[3] &= mask;
-	zr = #copy(zr2);*/
-  zr = __invert4(zr);
+  #update_after_call
+  zr, msf = __invert4(zr, msf);
   
 	z = #copy(zr);
 	  
@@ -35,5 +27,5 @@ inline fn __encode_point(stack u64[4] x y z) -> reg u64[4]
   
 	res = #copy(y);
 	
-  return res;
+  return res, msf;
 }

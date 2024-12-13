@@ -1,9 +1,12 @@
-require "mul4.jinc"
-require "sqr4.jinc"
+// require "mul4.jinc"
+// require "sqr4.jinc"
+require "safe-gcd.jinc"
+require "fe25519_pack.jinc"
 
 // TODO:
 // - rewrite invert4 (& aux. functions) once reg arrays are supported in non-inline functions
 // - this should reduce the size of scalarmult.s to half
+/*
 fn _invert4(reg u64 f0 f1 f2 f3) -> reg u64, reg u64, reg u64, reg u64
 {
   reg u32 i;
@@ -110,46 +113,31 @@ fn _invert4(reg u64 f0 f1 f2 f3) -> reg u64, reg u64, reg u64, reg u64
 	h3 = t1[3];
 	
   return h0, h1, h2, h3;
-}
+}*/
 
-inline fn __invert4(reg u64[4] f) -> reg u64[4]
+inline fn __invert4(reg u64[4] f, #msf reg u64 msf) -> reg u64[4], #msf reg u64
 {
-	reg u64 argf0 argf1 argf2 argf3;
-  reg u64 res0 res1 res2 res3;
   reg u64[4] h;
   
-  argf0 = f[0];
-  argf1 = f[1];
-  argf2 = f[2];
-  argf3 = f[3];
-  
-  res0, res1, res2, res3 = _invert4(argf0, argf1, argf2, argf3);
- 	
-	h[0] = res0;
-	h[1] = res1;
-	h[2] = res2;
-	h[3] = res3;
+  f = __fe25519_pack(f);
+	f[3] &= mask63;
+	#update_after_call
+	h, msf = __crypto_pow(f, msf);
+	h[3] &= mask63;
 	
-	return h;
+	return h, msf;
 }
 
-inline fn __invert4_ss(stack u64[4] fs) -> stack u64[4]
+inline fn __invert4_ss(stack u64[4] fs, #msf reg u64 msf) -> stack u64[4], #msf reg u64
 {
   stack u64[4] hs;
-  reg u64 argf0 argf1 argf2 argf3;
-  reg u64 res0 res1 res2 res3;
+  reg u64[4] f h;
 
-  argf0 = fs[0];
-  argf1 = fs[1];
-  argf2 = fs[2];
-  argf3 = fs[3];
+  f = #copy(fs);
   
-  res0, res1, res2, res3 = _invert4(argf0, argf1, argf2, argf3);
- 	
-	hs[0] = res0;
-	hs[1] = res1;
-	hs[2] = res2;
-	hs[3] = res3;
+  h, msf = __invert4(f, msf);
+  
+	hs = #copy(h);
 
-  return hs;
+  return hs, msf;
 }

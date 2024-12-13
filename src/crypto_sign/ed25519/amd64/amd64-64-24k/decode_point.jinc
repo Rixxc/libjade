@@ -6,15 +6,15 @@ require "sqr_root4.jinc"
 require "invert4.jinc"
 require "reduce_p4.jinc"
 
-inline fn __decode_point(stack u64[4] y d ps) -> stack u64[4], stack u64[4], stack u64[4], stack u64[4], stack u8
+inline fn __decode_point(stack u64[4] y, #msf reg u64 msf) -> stack u64[4], stack u64[4], stack u64[4], stack u64[4], stack u8, #msf reg u64
 {
-  stack u64[4] m1 x x2 x3 ys z3 t sqrt_m1s;
-  reg u64[4] sqrt_m1;
-  reg u64 z cond temp_64;
   reg u8 temp temp_aux sign;
-  stack u8 signs;
-  stack u8 valid;
+  reg u64 z cond temp_64 sign_64;
+  stack u8 signs valid;
+  stack u64[4] m1 x x2 x3 ys z3 t;
   inline int i;
+  reg bool branch_cond;
+  #mmx reg u64 msf_s;
   
   for i=0 to 4
 	{
@@ -24,19 +24,10 @@ inline fn __decode_point(stack u64[4] y d ps) -> stack u64[4], stack u64[4], sta
 	}
   y = #copy(ys);
   
-  // Establish constant and write them to the stack  
-  sqrt_m1[0] = 0xc4ee1b274a0ea0b0;
-  sqrt_m1[1] = 0x2f431806ad2fe478;
-  sqrt_m1[2] = 0x2b4d00993dfbd7a7;
-  sqrt_m1[3] = 0x2b8324804fc1df0b;
-  
   m1[0] = 1;
   m1[1] = 0;
   m1[2] = 0;
   m1[3] = 0;
-  
-  // ps = #copy(p);
-  sqrt_m1s = #copy(sqrt_m1);
   
   valid = 1;
   
@@ -47,22 +38,38 @@ inline fn __decode_point(stack u64[4] y d ps) -> stack u64[4], stack u64[4], sta
   temp &= 0x7f;
   y[u8 31] = temp;
   
+  sign_64 = (64u) sign;
+  sign_64 = #protect(sign_64, msf);
+  sign = (8u) sign_64;
   signs = sign;
   
   // Check if y < p
-  temp = __cmp4_ss(ps, y);
-  if (temp != -1){
+  temp = __cmp4_ss(p, y);
+  temp_64 = (64s) temp;
+  temp_64 = #protect(temp_64, msf);
+  
+  branch_cond = temp_64 != 1;
+  if (branch_cond){
+  	msf = #update_msf(branch_cond, msf);
     valid = 0;
   }
+  else{
+  	msf = #update_msf(!branch_cond, msf);
+  }
   
+  msf_s = #mov_msf(msf);
   x3 = __sqr4_ss(y);
-  x2 = __mul4_sss(x3, d); // d * y * y
+  x2 = __mul4_sss(x3, ecd); // d * y * y
   x3 = __sub4_sss(x3, m1); // y * y - 1
   x2 = __add4_sss(x2, m1); // d * y * y + 1
-  x2 = __invert4_ss(x2);
+  msf = #mov_msf(msf_s);
+  x2, msf = __invert4_ss(x2, msf);
+  msf_s = #mov_msf(msf);
   x2 = __mul4_sss(x2, x3);
   
-  x = __sqr_root4_ss(x2);
+  msf = #mov_msf(msf_s);
+  x, msf = __sqr_root4_ss(x2, msf);
+  msf_s = #mov_msf(msf);
   
   x3 = __sqr4_ss(x);
   x3 = __sub4_sss(x3, x2);
@@ -72,8 +79,18 @@ inline fn __decode_point(stack u64[4] y d ps) -> stack u64[4], stack u64[4], sta
   cond |= x3[1];
   cond |= x3[2];
   cond |= x3[3];
-  if(cond != 0){
-  	x = __mul4_sss(x, sqrt_m1s);
+  
+  msf = #mov_msf(msf_s);
+  cond = #protect(cond, msf);
+  branch_cond = cond != 0;
+  if(branch_cond){
+  	msf = #update_msf(branch_cond, msf);
+  	msf_s = #mov_msf(msf);
+  	x = __mul4_sss(x, sqrtm1);
+  }
+  else{
+  	msf = #update_msf(!branch_cond, msf);
+  	msf_s = #mov_msf(msf);
   }
   
   x3 = __sqr4_ss(x);
@@ -83,19 +100,40 @@ inline fn __decode_point(stack u64[4] y d ps) -> stack u64[4], stack u64[4], sta
   cond |= x3[1];
   cond |= x3[2];
   cond |= x3[3];
-  if(cond != 0){
+  
+  msf = #mov_msf(msf_s);
+  cond = #protect(cond, msf);
+  
+  branch_cond = cond != 0;
+  if(branch_cond){
+  	msf = #update_msf(branch_cond, msf);
     valid = 0;
   }
+  else{
+  	msf = #update_msf(!branch_cond, msf);
+  }
+  msf_s = #mov_msf(msf);
   
   x = __reduce_p4(x);
   
   sign = signs;
   
+  msf = #mov_msf(msf_s);
   temp = x[u8 0];
+  temp_64 = (64u) temp;
+  temp_64 = #protect(temp_64, msf);
+  temp = (8u) temp_64;
   temp = temp & 1;
   
-  if(temp != sign){
-    x = __sub4_sss(ps, x);
+  branch_cond = temp != sign;
+  if(branch_cond){
+  	msf = #update_msf(branch_cond, msf);
+  	msf_s = #mov_msf(msf);
+    x = __sub4_sss(p, x);
+  }
+  else{
+  	msf = #update_msf(!branch_cond, msf);
+  	msf_s = #mov_msf(msf);
   }
   
   t = __mul4_sss(x, y);
@@ -112,10 +150,22 @@ inline fn __decode_point(stack u64[4] y d ps) -> stack u64[4], stack u64[4], sta
   cond |= x2[1];
   cond |= x2[2];
   cond |= x2[3];
+  
+  msf = #mov_msf(msf_s);
+  cond = #protect(cond, msf);
   sign = signs;
-  if (cond == 0){
-    if (sign != 0){
+  
+  branch_cond = cond == 0;
+  if(branch_cond){
+  	msf = #update_msf(branch_cond, msf);
+  	
+    branch_cond = sign != 0;
+  	if(branch_cond){
+  		msf = #update_msf(branch_cond, msf);
       valid = 0;
+    }
+    else{
+    	msf = #update_msf(!branch_cond, msf);
     }
     
     ?{}, z = #set0();
@@ -127,6 +177,9 @@ inline fn __decode_point(stack u64[4] y d ps) -> stack u64[4], stack u64[4], sta
       x[i] = z;
     }
   }
+  else{
+  	msf = #update_msf(!branch_cond, msf);
+  }
   
-  return x, y, z3, t, valid;
+  return x, y, z3, t, valid, msf;
 }

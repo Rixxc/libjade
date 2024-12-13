@@ -3,25 +3,21 @@ require "ge25519_nielsadd2.jinc"
 require "choose_t.jinc"
 require "init_r.jinc"
 
-fn ge25519_scalarmult_base(reg ptr u64[16] r, reg u64 s0 s1 s2 s3) -> reg ptr u64[16]
+inline fn __ge25519_scalarmult_base(stack u64[16] r, reg u64[4] s, #msf reg u64 msf) -> reg ptr u64[16], #msf reg u64
 {
-	stack ptr u64[16] rps;
+  reg u8 b_8;
+  #spill_to_mmx
+  reg u64 i;
+  reg u64 b_arg pos_arg;
+  reg u64[4] rx ry rz;
   stack u8[64] b;
   stack u64[12] t;
   stack u64[19] rs;
-  reg u64[4] s rx ry rz;
-  reg u8 b_8;
-  reg u64 b_arg pos_arg;
-  stack u64 i;
-  reg u64 ir;
 	inline int j;
+	reg bool cond;
+	#mmx reg u64 msf_s;
 	
-	rps = r;
-	
-	s[0] = s0;
-	s[1] = s1;
-	s[2] = s2;
-	s[3] = s3;
+	msf_s = #mov_msf(msf);
 	
   b = sc25519_window4(s);
 
@@ -32,22 +28,27 @@ fn ge25519_scalarmult_base(reg ptr u64[16] r, reg u64 s0 s1 s2 s3) -> reg ptr u6
   
 	
 	i = 1;
-	ir = i;
-  while(ir < 64)
+	() = #spill(i);
+	
+	
+  while{cond = (i < 64); msf = #mov_msf(msf_s);}(cond)
   {
-  	b_arg = (64s) b[(int)ir];
+  	msf = #update_msf(cond, msf);
+  	msf_s = #mov_msf(msf);
+  	
+  	b_arg = (64s) b[(int)i];
   	pos_arg = i;
   	
     t = choose_t(pos_arg, b_arg);
     rs = ge25519_nielsadd2(t, rs);
     
-    ir = i;
-    ir += 1;
-    i = ir;
+    () = #unspill(i);
+    i += 1;
+    () = #spill(i);
   }
-  
-  r = rps;
-
+	msf = #update_msf(!cond, msf);
+	msf_s = #mov_msf(msf);
+	
   rx = __reduce5to4_rs(rs[0:5]);
   for j=0 to 4
   {
@@ -71,19 +72,6 @@ fn ge25519_scalarmult_base(reg ptr u64[16] r, reg u64 s0 s1 s2 s3) -> reg ptr u6
   	r[12 + j] = rs[15+j];
   }
   
-  return r;
-}
-
-inline fn __ge25519_scalarmult_base(reg ptr u64[16] r, reg u64[4] s) -> reg ptr u64[16]
-{
-	reg u64 s0 s1 s2 s3;
-	
-	s0 = s[0];
-	s1 = s[1];
-	s2 = s[2];
-	s3 = s[3];
-	
-	r = ge25519_scalarmult_base(r, s0, s1, s2, s3);
-	
-	return r;
+  msf = #mov_msf(msf_s);
+  return r, msf;
 }

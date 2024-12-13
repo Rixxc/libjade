@@ -1,2 +1,2 @@
-SRCS := ed_sign.jazz
+SRCS := ed25519.jazz
 include ../../../../Makefile.common

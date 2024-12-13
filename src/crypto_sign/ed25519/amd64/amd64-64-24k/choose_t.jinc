@@ -1,19 +1,12 @@
 require "ge25519_base_niels_256.jinc"
 
-u64[4] v1234 = {1,2,3,4};
-u64[4] v5678 = {5,6,7,8};
-u64[4] _1 = {1,0,0,0};
-
 inline fn choose_t(reg u64 pos, reg u64 b) -> stack u64[12]
 {	
-	reg bool cf;
-	reg u64 mask subt0 subt1 u;
+	reg u64 mask u;
 	reg u256 cmp_1 cmp_2 cmp_3 cmp_4 cmp_5 cmp_6 cmp_7 cmp_8;
 	reg u128 b_128 u_128;
-	reg u256 b_256 u_256 t tt_256;
+	reg u256 b_256 p_256 u_256 t tt_256;
 	reg u256 tysubx txaddy tt2d;
-	reg u64[4] tt;
-	stack u64[4] tt2ds tts;
 	stack u64[12] t_stack;
 	reg ptr u256[1536] _basep;
 	
@@ -83,58 +76,12 @@ inline fn choose_t(reg u64 pos, reg u64 b) -> stack u64[12]
 	t_stack[u256 0] = tysubx;
 	t_stack[u256 1] = txaddy;
 
-	tt2ds[u256 0] = tt2d;
+	p_256 = p[u256 0];
+	tt_256 = #VPSUB_4u64(p_256, tt2d);
 	
-	tt[0] = 0;
-	tt[1] = 0;
-	tt[2] = 0;
-	tt[3] = 0;
-	
-	cf, tt[0] -= tt2ds[0];
-	cf, tt[1] -= tt2ds[1] - cf;
-	cf, tt[2] -= tt2ds[2] - cf;
-	cf, tt[3] -= tt2ds[3] - cf;
-
-	subt0 = 0;
-	subt1 = 38;
-	subt1 = #CMOVcc_64(!cf, subt0, subt1);
-
-	cf, tt[0] -= subt1;
-	cf, tt[1] -= subt0 - cf;
-	cf, tt[2] -= subt0 - cf;
-	cf, tt[3] -= subt0 - cf;
-	
-	subt0 = #CMOVcc_64(cf, subt1, subt0);
-
-	tt[0] -= subt0;
-	
-	tts = #copy(tt);
-	tt_256 = tts[u256 0];
 	tt2d = #VPBLENDVB_256(tt2d, tt_256, b_256);
 
 	t_stack[u256 2] = tt2d;
 
 	return t_stack;
-}
-
-export fn j_choose_t(reg u64 tp pos b) -> reg u64
-{
-	stack u64[12] t;
-	reg u64 rax;
-	stack u64 tps;
-	inline int i;
-	
-	tps = tp;
-	
-	t = choose_t(pos, b);
-	
-	tp = tps;
-	for i = 0 to 12
-	{
-		[tp + 8*i] = t[i];
-	}
-	
-	rax = 0;
-	
-	return rax;
 }

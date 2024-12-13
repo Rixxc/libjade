@@ -84,6 +84,7 @@ inline fn ge25519_nielsadd2(stack u64[12] q, stack u64[19] r) -> stack u64[19]
 	// p = r
 	// r->X = p->X * p->T
 	rx = __mul5_rss(as4, fs4);
+	
 	for i=0 to 5
 	{
 		r[i] = rx[i];

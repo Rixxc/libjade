@@ -1,6 +1,7 @@
 require "reduce4.jinc"
 
-fn _sqr4_rr(reg u64 f0 f1 f2 f3) -> reg u64, reg u64, reg u64, reg u64
+// TODO: Change to inline
+inline fn _sqr4_rr(reg u64 f0 f1 f2 f3) -> reg u64, reg u64, reg u64, reg u64
 {
   reg bool cf of;
   reg u64[8] t;
@@ -105,23 +106,33 @@ inline fn __sqr4_rr(reg u64[4] f)-> reg u64[4]
 	return res;
 }
 
-inline fn __it_sqr4_x2(reg u64[4] f, reg u32 i) -> reg u64[4]
+inline fn __it_sqr4_x2(reg u64[4] f, reg u32 i, #msf reg u64 msf) -> reg u64[4], #msf reg u64
 {
   reg bool zf;
   reg u64[4] h;
   stack u32 _i;
-
-  while
-  { _i = i;
+  reg bool cond;
+  #mmx reg u64 msf_s;
+  
+  msf_s = #mov_msf(msf);
+  
+  while{cond = (i != 0); msf = #mov_msf(msf_s);}(cond)
+  { 
+  	msf = #update_msf(cond, msf);
+  	msf_s = #mov_msf(msf);
+  	
+  	_i = i;
 
     h = __sqr4_rr(f);
     f = __sqr4_rr(h);
-
+		
     i = _i;
     _,_,_,zf,i = #DEC_32(i);
-  } (!zf)
-
-  return f;
+  }
+  msf = #mov_msf(msf_s);
+	msf = #update_msf(!cond, msf);
+	
+  return f, msf;
 }
 
 inline fn __sqr4_ss(stack u64[4] fs) -> stack u64[4]

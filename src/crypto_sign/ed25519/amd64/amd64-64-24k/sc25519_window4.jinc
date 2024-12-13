@@ -1,41 +1,34 @@
+u256 _32x15 = (32u8)[0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f];
+
 inline fn sc25519_window4(reg u64[4] s) -> stack u8[64]
 {
-	stack u8[64] r;
 	reg u8 carry temp_8;
-	reg u64 temp;
+	reg u128 v_128;
+	reg u256 v_256 w_256 r_low r_high;
+	stack u8[64] r;
 	inline int i;
 	
-	for i=0 to 16
-	{
-		temp = s[0];
-		temp = temp >> (4*i);
-		temp &= 15;
-		r[i] = (8u)temp;
-	}
 	
-	for i=0 to 16
-	{
-		temp = s[1];
-		temp = temp >> (4*i);
-		temp &= 15;
-		r[16 + i] = (8u)temp;
-	}
+	v_128 = #set0_128();
+	v_128 = #VPINSR_2u64(v_128, s[0], 0);
+	v_256 = (256u)#VPINSR_2u64(v_128, s[1], 1);
+	v_128 = #VPINSR_2u64(v_128, s[2], 0);
+	v_128 = #VPINSR_2u64(v_128, s[3], 1);
+	v_256 = #VINSERTI128(v_256, v_128, 1);
 	
-	for i=0 to 16
-	{
-		temp = s[2];
-		temp = temp >> (4*i);
-		temp &= 15;
-		r[32 + i] = (8u)temp;
-	}
+	w_256 = v_256;
 	
-	for i=0 to 16
-	{
-		temp = s[3];
-		temp = temp >> (4*i);
-		temp &= 15;
-		r[48 + i] = (8u)temp;
-	}
+	v_256 = #VPAND_256(v_256, _32x15);
+	w_256 = #VPSRL_4u64(w_256, 4);
+	w_256 = #VPAND_256(w_256, _32x15);
+	
+	r_low = #VPUNPCKL_32u8(v_256, w_256);
+	r_high = #VPUNPCKH_32u8(v_256, w_256);
+	
+	r[u256 0] = r_low;
+	r[u256 1] = r_high;
+	r[u128 2] = #VEXTRACTI128(r_low, 1);
+	r[u128 1] = #VEXTRACTI128(r_high, 0);
 	
 	carry = 0;
 	
