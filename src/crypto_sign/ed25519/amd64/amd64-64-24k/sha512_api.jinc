@@ -346,11 +346,12 @@ inline fn sha512_update_32(reg ptr u64[25] pstate, reg u64[4] m, #msf reg u64 ms
 }
 
 #[sct="{ ptr: public, val: { n: d, s:secret } } * public * secret * msf -> { ptr: public, val: { n: d, s:secret } } * msf"]
-inline fn sha512_update_ext(reg ptr u64[25] pstate, reg u64 m, reg u64 inlen, #msf reg u64 msf) -> reg ptr u64[25], #msf reg u64
+fn sha512_update_ext(reg ptr u64[25] pstate, reg u64 m, reg u64 inlen, #msf reg u64 msf) -> reg ptr u64[25], #msf reg u64
 {
 	reg u8 cond_8;
 	reg u64 iterations mod_len total_len;
 	reg u64 j;
+	stack u64 m_s;
 	reg u256 block_offs_256 cond_256 inv_lane_256 lane_256 mask_256 modlen_256 shift_256 v_256;
 	reg u256[4] m_buf;
 	reg u256[8] m_shift;
@@ -390,18 +391,24 @@ inline fn sha512_update_ext(reg ptr u64[25] pstate, reg u64 m, reg u64 inlen, #m
 	
 	j = iterations;
 	
+	m_s = m;
+	
 	?{"!=" = neq} = #CMP(j, 0);
 	#declassify cond_8 = #SETcc(neq);
   cond_8 = #protect_8(cond_8, msf);
-  
 	while {cond = (cond_8 == 1);}(cond) {
 		msf = #update_msf(cond, msf);
+		
+		m = m_s;
 		
 		m = #protect(m, msf);
 		m_buf[0] = (u256)[m];
 		m_buf[1] = (u256)[m + 32];
 		m_buf[2] = (u256)[m + 64];
 		m_buf[3] = (u256)[m + 96];
+		
+		m += 128;
+		m_s = m;
 		
 		m_shift = shift_bytes(m_buf, block_offs_256, inv_lane_256, lane_256, mask_256, shift_256);
 		
@@ -413,7 +420,6 @@ inline fn sha512_update_ext(reg ptr u64[25] pstate, reg u64 m, reg u64 inlen, #m
 		}
 		
 		j_s = j;
-		#update_after_call
 		pstate, msf = _blocks_0_ref(pstate, msf);
 		
 		for k=0 to 4
@@ -421,7 +427,6 @@ inline fn sha512_update_ext(reg ptr u64[25] pstate, reg u64 m, reg u64 inlen, #m
 			pstate[u256 k] = #VMOVDQA_256(m_shift[4+k]);
 		}
 		
-		m += 128;
 		j = j_s;
 		j -= 1;
 		
@@ -431,6 +436,7 @@ inline fn sha512_update_ext(reg ptr u64[25] pstate, reg u64 m, reg u64 inlen, #m
 	}
 	msf = #update_msf(!cond, msf);
 	
+	m = m_s;
 	m = #protect(m, msf);
 	m_buf[0] = (u256)[m];
 	m_buf[1] = (u256)[m + 32];
@@ -449,106 +455,16 @@ inline fn sha512_update_ext(reg ptr u64[25] pstate, reg u64 m, reg u64 inlen, #m
 	return pstate, msf;
 }
 
-/*inline fn sha512_update_ext_align(reg ptr u64[25] pstate, reg u64 m, reg u64 inlen, #msf reg u64 msf) -> reg ptr u64[25], #msf reg u64
-{
-	reg u64 inlen_2 iterations m_2 mod_len total_len;
-	
-	#spill_to_mmx reg u64 j;
-	reg u256 v_256;
-	inline int i;
-	reg bool cond;
-	#mmx reg u64 m_s;
-		
-	m_s = m;
-	inlen = inlen;
-	// Update len
-	total_len = pstate[24];
-	mod_len = total_len;
-	total_len = total_len + inlen;
-	pstate[24] = total_len;
-	
-	mod_len = mod_len & 0x7f;	
-	iterations = mod_len;
-	iterations = iterations + inlen;
-	inlen_2 = iterations;
-	iterations = iterations >> 7;
-	
-	j = iterations;
-	
-	inlen_2 = inlen_2 & 0x7f;
-	?{"==" = cond} = #CMP(j, 0);
-	inlen = #CMOVcc(!cond, inlen_2, inlen);
-	() = #spill(inlen);
-	
-	while {cond = (j != 0);}(cond) {
-		msf = #update_msf(cond, msf);
-		m = m_s;
-		
-		while {cond = (mod_len < 128);}(cond) {
-			msf = #update_msf(cond, msf);
-			v_256 = (u256)[m];
-			pstate.[u256 (int)mod_len] = v_256;
-			mod_len += 32;
-			m += 32;
-		}
-		msf = #update_msf(!cond, msf);
-		
-		() = #spill(j);
-		m_s = m;
-		
-		#update_after_call
-		pstate, msf = _blocks_0_ref(pstate, msf);
-		
-		() = #unspill(j);	
-		mod_len = 0;
-		
-		j -= 1;
-	}
-	msf = #update_msf(!cond, msf);
-	
-	mod_len = mod_len >> 3;
-	
-	m_s = m;
-	() = #unspill(inlen);
-	inlen = #protect(inlen, msf);
-	
-	while {cond = (inlen > 7);}(cond) {
-		msf = #update_msf(cond, msf);
-		
-		pstate[u64 (int)mod_len] = (u64)[m];
-		mod_len += 1;
-		m += 8;
-		inlen -= 8;
-	}
-	msf = #update_msf(!cond, msf);
-	
-	mod_len = mod_len << 3;
-	
-	for i=0 to 8
-	{
-		pstate[u8 (int)mod_len + i] = (u8)[m];
-		m_2 = m;
-		m += 1;
-		?{">u" = cond} = #CMP(inlen, i);
-		m = #CMOVcc(cond, m, m_2);
-	}
-	
-	return pstate, msf;
-}*/
-
 #[sct="{ ptr: public, val: { n: d, s:secret } } * { ptr: public, val: { n: d, s:secret } } * msf -> { ptr: public, val: { n: d, s:secret } } * msf"]
-inline fn sha512_finalize(reg ptr u64[25] pstate, reg ptr u64[8] Hreg, #msf reg u64 msf) -> reg ptr u64[8], #msf reg u64
+fn sha512_finalize(reg ptr u64[25] pstate, reg ptr u64[8] Hreg, #msf reg u64 msf) -> reg ptr u64[8], #msf reg u64
 {
 	#secret reg u64 len mod_len nblocks temp;
 	reg u256 bswap_256 v_256;	
 	#secret stack u8[128] in;
-	#secret stack u64[8] Hs;
 	#secret stack u64[32] sblocks;
-	reg ptr u64[8] Hp;
   reg ptr u64[32] sblocksp;
   inline int i;
 	
-	Hp = Hs;
 	
 	for i = 0 to 4{
 		v_256 = #VMOVDQA_256(pstate[u256 i]);
@@ -565,15 +481,15 @@ inline fn sha512_finalize(reg ptr u64[25] pstate, reg ptr u64[8] Hreg, #msf reg 
   
   for i=0 to 2{
 		v_256 = #VMOVDQA_256(pstate[u256 4+i]);
-		Hp[u256 i] = #VMOVDQA_256(v_256);
+		Hreg[u256 i] = #VMOVDQA_256(v_256);
   }
   
-  Hp, _, msf = _blocks_1_ref(Hp, sblocksp, nblocks, msf);
+  Hreg, _, msf = _blocks_1_ref(Hreg, sblocksp, nblocks, msf);
   
   bswap_256 = bswap_indices;
   for i=0 to 2
   { 
-  	v_256 = #VMOVDQA_256(Hp[u256 i]);
+  	v_256 = #VMOVDQA_256(Hreg[u256 i]);
   	v_256 = #VPSHUFB_256(v_256, bswap_256);
     Hreg[u256 i] = #VMOVDQA_256(v_256);
   }

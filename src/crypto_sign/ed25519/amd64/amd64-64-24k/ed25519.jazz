@@ -49,7 +49,7 @@ export fn jade_ed25519_amd64_keygen(reg u64 skp pkp) -> reg u64
   
   Hreg = H;
 	pstate = state;
-	// Protect here
+	#update_after_call
 	Hreg, msf = sha512_finalize(pstate, Hreg, msf);
 	H = Hreg;
 	h = #copy(H);
@@ -57,7 +57,6 @@ export fn jade_ed25519_amd64_keygen(reg u64 skp pkp) -> reg u64
   ks = __decode_scalar(h);
   h_red = #copy(ks);
   
-  // Protect here
   pk, msf = __curve25519_mulx_base(h_red, msf);
   
   pkp = pkps;
@@ -100,7 +99,7 @@ export fn jade_ed25519_amd64_pubkey(reg u64 skp pkp) -> reg u64
   
   Hreg = H;
 	pstate = state;
-	// Protect here
+	#update_after_call
 	Hreg, msf = sha512_finalize(pstate, Hreg, msf);
 	H = Hreg;
 	h = #copy(H);
@@ -108,7 +107,6 @@ export fn jade_ed25519_amd64_pubkey(reg u64 skp pkp) -> reg u64
   ks = __decode_scalar(h);
   h_red = #copy(ks);
   
-  // Protect here
   pk, msf = __curve25519_mulx_base(h_red, msf);
   
   pkp = pkps;
@@ -151,7 +149,7 @@ export fn jade_ed25519_amd64_sign(#transient reg u64 skp mp msg_len sigp) -> reg
   
   Hreg = H;
 	pstate = state;
-	// Protect here
+	#update_after_call
 	Hreg, msf = sha512_finalize(pstate, Hreg, msf);
 	H = Hreg;
 	h = #copy(H);
@@ -167,21 +165,20 @@ export fn jade_ed25519_amd64_sign(#transient reg u64 skp mp msg_len sigp) -> reg
   mp = mps;
   msg_len = msg_lens;
   pstate = state;
-  // Protect here
   mp = #protect(mp, msf);
+	#update_after_call
   pstate, msf = sha512_update_ext(pstate, mp, msg_len, msf);
   state = pstate;
   
   Hreg = H;
 	pstate = state;
-	// Protect here
+	#update_after_call
 	Hreg, msf = sha512_finalize(pstate, Hreg, msf);
 	H = Hreg;
   
   msf_s = #mov_msf(msf);
   h_red = sc25519_barrett(H);
   rs = #copy(h_red);
-  // Protect here
   msf = #mov_msf(msf_s);
   R, msf = __curve25519_mulx_base(h_red, msf);
   
@@ -201,14 +198,14 @@ export fn jade_ed25519_amd64_sign(#transient reg u64 skp mp msg_len sigp) -> reg
 	mp = mps;
   msg_len = msg_lens;
   pstate_2 = state_2;
-  // Protect here
   mp = #protect(mp, msf);
+	#update_after_call
   pstate_2, msf = sha512_update_ext(pstate_2, mp, msg_len, msf);
   state_2 = pstate_2;
   
   Hreg = H;
 	pstate_2 = state_2;
-	// Protect here
+	
 	Hreg, msf = sha512_finalize(pstate_2, Hreg, msf);
 	H = Hreg;
   msf_s = #mov_msf(msf);
@@ -250,8 +247,6 @@ export fn jade_ed25519_amd64_verify(#transient reg u64 sigp pkp mp msg_len) -> r
   msg_lens = msg_len;
   mps = mp;
   
-  pkp = #protect(pkp, msf);
-  sigp = #protect(sigp, msf);
   #declassify A_256 = (u256)[pkp];
   #declassify R_256 = (u256)[sigp];
   sigps = sigp;
@@ -269,11 +264,13 @@ export fn jade_ed25519_amd64_verify(#transient reg u64 sigp pkp mp msg_len) -> r
   mp = mps;
   msg_len = msg_lens;
   mp = #protect(mp, msf);
+  #update_after_call
   pstate, msf = sha512_update_ext(pstate, mp, msg_len, msf);
   state = pstate;
   
   Hreg = H;
 	pstate = state;
+	#update_after_call
 	Hreg, msf = sha512_finalize(pstate, Hreg, msf);
 	H = Hreg;
   msf_s = #mov_msf(msf);
@@ -281,7 +278,6 @@ export fn jade_ed25519_amd64_verify(#transient reg u64 sigp pkp mp msg_len) -> r
   h_red = sc25519_barrett(H);
   for i=0 to 4{
   	temp_64 = As[i];
-  	temp_64 = #protect(temp_64, msf);
   	temp_64 = #BSWAP_64(temp_64);
   	A[3-i] = temp_64;
   }
@@ -292,7 +288,6 @@ export fn jade_ed25519_amd64_verify(#transient reg u64 sigp pkp mp msg_len) -> r
   for i=0 to 4{
   	#declassify temp_64 = s_enc[i];
   	temp_64 = #BSWAP_64(temp_64);
-  	temp_64 = #protect(temp_64, msf);
   	s_encs[3-i] = temp_64;
   }
   

@@ -26,9 +26,8 @@ inline fn __initH_ref() -> stack u64[8]
   return H;
 }
 
-inline fn __load_H_ref(reg ptr u64[8] H) -> reg u64, reg u64, reg u64, reg u64,
-                                            reg u64, reg u64, reg u64, reg u64,
-                                            reg ptr u64[8]
+inline fn __load_H_ref(stack u64[8] H) -> reg u64, reg u64, reg u64, reg u64,
+                                            reg u64, reg u64, reg u64, reg u64
 {
   reg u64 a b c d e f g h;
 
@@ -41,11 +40,13 @@ inline fn __load_H_ref(reg ptr u64[8] H) -> reg u64, reg u64, reg u64, reg u64,
   g = H[6];
   h = H[7];
 
-  return a, b, c, d, e, f, g, h, H;
+  return a, b, c, d, e, f, g, h;
 }
 
-inline fn __store_H_ref(reg ptr u64[8] H, reg u64 a b c d e f g h) -> reg ptr u64[8]
+inline fn __store_H_ref(reg u64 a b c d e f g h) -> stack u64[8]
 {
+  stack u64[8] H;
+  
   H[0] = a;
   H[1] = b;
   H[2] = c;
@@ -81,9 +82,7 @@ inline fn __CH_ref(reg u64 x y z) -> reg u64
 
   r  =  x;
   r &=  y;
-  s  =  x;
-  s  = !s;
-  s &=  z;
+  s  =  !x & z;
   r ^=  s;
 
   return r;
@@ -94,11 +93,10 @@ inline fn __MAJ_ref(reg u64 x y z) -> reg u64
 {
   reg u64 r s;
 
-  r  = x;
-  r &= y;
-  s  = x;
-  s &= z;
-  r ^= s;
+  r  = y;
+  r ^= z;
+  r &= x;
+  
   s  = y;
   s &= z;
   r ^= s;
@@ -135,101 +133,278 @@ inline fn __BSIG1_ref(reg u64 x) -> reg u64
 }
 
 // (x >>> 1) ^ (x >>> 8) ^ (x >> 7)
-inline fn __SSIG0_ref(reg u64 x) -> reg u64
+inline fn __SSIG0_avx(reg u256 X) -> reg u256
 {
-  reg u64 r s;
+  reg u256 Xleft63 Xright1 Xsigma0;
+  reg u256 Xleft56 Xright8;
+  reg u256 Xright7;
 
-  r  = __ROTR_ref(x, 1);
-  s  = __ROTR_ref(x, 8);
-  r ^= s;
-  s  = __SHR_ref(x, 7);
-  r ^= s;
+  Xright1 = #VPSRL_4u64(X, 1);
+  Xleft63 = #VPSLL_4u64(X, 63);
+  Xsigma0 = Xright1 ^ Xleft63;
+  
+  Xright8 = #VPSRL_4u64(X, 8);
+  Xsigma0 ^= Xright8;
+  Xleft56 = #VPSLL_4u64(X, 56);
+  Xsigma0 ^= Xleft56;
+  
+  Xright7 = #VPSRL_4u64(X, 7);
+  Xsigma0 ^= Xright7;
 
-  return r;
+  return Xsigma0;
 }
 
-// (x >>> 19) ^ (x >>> 61) ^ (x >> 6)
-inline fn __SSIG1_ref(reg u64 x) -> reg u64
+inline fn __SSIG1_avx(reg u128 W) -> reg u256
 {
-  reg u64 r s;
-
-  r  = __ROTR_ref(x, 19);
-  s  = __ROTR_ref(x, 61);
-  r ^= s;
-  s  = __SHR_ref(x, 6);
-  r ^= s;
-
-  return r;
+  reg u128 Wleft45 Wright19 Wsigma1;
+  reg u128 Wleft3 Wright61;
+  reg u128 Wright6;
+  reg u256 W_256;
+  
+  Wright19 = #VPSRL_2u64(W, 19);
+  Wleft45 = #VPSLL_2u64(W, 45);
+  Wsigma1 = Wleft45 ^ Wright19;
+  
+  Wright61 = #VPSRL_2u64(W, 61);
+  Wsigma1 ^= Wright61;
+  Wleft3 = #VPSLL_2u64(W, 3);
+  Wsigma1 ^= Wleft3;
+  
+  Wright6 = #VPSRL_2u64(W, 6);
+  
+  W_256 = (256u)#VPXOR_128(Wsigma1, Wright6);
+  
+  return W_256;
 }
 
 // Wt = SSIG1(W(t-2)) + W(t-7) + SSIG0(t-15) + W(t-16)
-inline fn __Wt_ref(stack u64[80] W, inline int t, #msf reg u64 msf) -> stack u64[80], #msf reg u64
+inline fn __Wt_part_avx(stack u64[20] W, reg ptr u64[80] Kp, reg u64 tr, inline int i) -> stack u64[20], reg u256
 {
-  reg u64 wt wt2 wt15;
-
-  wt2  = W[t-2];
-  wt   = __SSIG1_ref(wt2);
-  wt  += W[t-7];
-  wt15 = W[t-15];
-  wt15 = __SSIG0_ref(wt15);
-  wt  += wt15;
-  wt  += W[t-16];
+	reg u128 W_128 X_128;
+	reg u256 D_256 Wsigma1_256 X0 X1;
 	
-	wt = #protect(wt, msf);
-  W[t] = wt;
-
-  return W, msf;
+	X0 = W.[u256 32*i];
+	X1 = W.[u256 32*i + 8];
+	X1 = __SSIG0_avx(X1);
+	X0 = #VPADD_4u64(X0, X1);
+	X0 = #VPADD_4u64(X0, W.[u256 (72 + 32*i) % 128]);
+	
+	W_128 = W.[u128 (112 + 32*i) % 128];
+	Wsigma1_256 = __SSIG1_avx(W_128);
+	X0 = #VPADD_4u64(X0, Wsigma1_256);
+	
+	X_128 = (128u) X0;
+	Wsigma1_256 = __SSIG1_avx(X_128);
+	Wsigma1_256 = #VPERMQ(Wsigma1_256, 0x4e);
+	X0 = #VPADD_4u64(X0, Wsigma1_256);
+	W[u256 i] = X0;
+	
+	D_256 = #VPADD_4u64(X0, Kp.[u256 (int)8*tr + 32*i]);
+	
+  return W, D_256;
 }
 
-inline fn __inner_sha(reg ptr u64[8] H, reg ptr u64[80] Kp, stack u64[80] W, #msf reg u64 msf) -> reg ptr u64[8], #msf reg u64
+inline fn __sha_step(reg u64 a b c d e f g h, stack u64[8] wc) -> reg u64, reg u64, reg u64, reg u64, reg u64, reg u64, reg u64, reg u64
 {
-	reg u64 T1 T2 a b c d e f g h r;
+	reg u64 r T1 T2;
+	
+	// Round 1
+	
+	//T1 = h + BSIG1(e) + CH(e,f,g) + Kt + Wt
+	r   = __BSIG1_ref(e);
+	T1  = h + r;
+	r   = __CH_ref(e, f, g);
+	T1 += r;
+	T1 += wc[0];
+
+	//T2 = BSIG0(a) + MAJ(a,b,c)
+	T2  = __BSIG0_ref(a);
+	r   = __MAJ_ref(a, b, c);
+	T2 += r;
+	
+	d += T1;
+	h  = T1 + T2;
+	// h += T2;
+  
+  // Round 2
+	
+	//T1 = g + BSIG1(d) + CH(d,e,f) + Kt + Wt
+	r   = __BSIG1_ref(d);
+	T1 = g + r;
+	r   = __CH_ref(d, e, f);
+	T1 += r;
+	T1 += wc[1];
+
+	//T2 = BSIG0(h) + MAJ(h,a,b)
+	T2  = __BSIG0_ref(h);
+	r   = __MAJ_ref(h, a, b);
+	T2 += r;
+	
+	c += T1;
+	g  = T1 + T2;
+	
+	// Round 3
+	
+	//T1 = f + BSIG1(c) + CH(c,d,e) + Kt + Wt
+	r   = __BSIG1_ref(c);
+	T1 = f + r;
+	r   = __CH_ref(c, d, e);
+	T1 += r;
+	T1 += wc[2];
+
+	//T2 = BSIG0(g) + MAJ(g,h,a)
+	T2  = __BSIG0_ref(g);
+	r   = __MAJ_ref(g, h, a);
+	T2 += r;
+	
+	b += T1;
+	f  = T1 + T2;
+	
+	// Round 4
+	
+	//T1 = e + BSIG1(b) + CH(b,c,d) + Kt + Wt
+	r   = __BSIG1_ref(b);
+	T1 = e + r;
+	r   = __CH_ref(b, c, d);
+	T1 += r;
+	T1 += wc[3];
+
+	//T2 = BSIG0(f) + MAJ(f,g,h)
+	T2  = __BSIG0_ref(f);
+	r   = __MAJ_ref(f, g, h);
+	T2 += r;
+	
+	a += T1;
+	e  = T1 + T2;
+	
+	// Round 5
+	
+	//T1 = d + BSIG1(a) + CH(a,b,c) + Kt + Wt
+	r   = __BSIG1_ref(a);
+	T1 = d + r;
+	r   = __CH_ref(a, b, c);
+	T1 += r;
+	T1 += wc[4];
+
+	//T2 = BSIG0(e) + MAJ(e,f,g)
+	T2  = __BSIG0_ref(e);
+	r   = __MAJ_ref(e, f, g);
+	T2 += r;
+	
+	h += T1;
+	d  = T1 + T2;
+	
+	// Round 6
+	
+	//T1 = c + BSIG1(h) + CH(h,a,b) + Kt + Wt
+	r   = __BSIG1_ref(h);
+	T1 = c + r;
+	r   = __CH_ref(h, a, b);
+	T1 += r;
+	T1 += wc[5];
+
+	//T2 = BSIG0(d) + MAJ(d,e,f)
+	T2  = __BSIG0_ref(d);
+	r   = __MAJ_ref(d, e, f);
+	T2 += r;
+	
+	g += T1;
+	c  = T1 + T2;
+	
+	// Round 7
+	
+	//T1 = b + BSIG1(g) + CH(g,h,a) + Kt + Wt
+	r   = __BSIG1_ref(g);
+	T1  = b + r;
+	r   = __CH_ref(g, h, a);
+	T1 += r;
+	T1 += wc[6];
+
+	//T2 = BSIG0(c) + MAJ(c,d,e)
+	T2  = __BSIG0_ref(c);
+	r   = __MAJ_ref(c, d, e);
+	T2 += r;
+	
+	f += T1;
+	b  = T1 + T2;
+	
+	// Round 8
+	
+	//T1 = a + BSIG1(f) + CH(f,g,h) + Kt + Wt
+	r   = __BSIG1_ref(f);
+	T1  = a + r;
+	r   = __CH_ref(f, g, h);
+	T1 += r;
+	T1 += wc[7];
+
+	//T2 = BSIG0(b) + MAJ(b,c,d)
+	T2  = __BSIG0_ref(b);
+	r   = __MAJ_ref(b, c, d);
+	T2 += r;
+	
+	e += T1;
+	a  = T1 + T2;
+	
+  return a, b, c, d, e, f, g, h;
+}
+
+inline fn __inner_sha(stack u64[8] H, reg ptr u64[80] Kp, stack u64[20] W, #msf reg u64 msf) -> reg ptr u64[8], #msf reg u64
+{
+	reg u64 a b c d e f g h;
 	reg u64 tr;
-	stack ptr u64[8] Hp;
+	stack u64[8] wc;
+	reg u256 D v_256;
 	reg bool cond;
+	inline int i;
 	#mmx reg u64 msf_s;
 	
-	a, b, c, d, e, f, g, h, H = __load_H_ref(H);
-  Hp = H;
-
-  tr = 0;
+	a, b, c, d, e, f, g, h = __load_H_ref(H);
+  
+  for i=0 to 2
+  {
+	  D = #VMOVDQA_256(W[u256 2*i]);
+	  D = #VPADD_4u64(D, Kp[u256 2*i]);
+	  wc[u256 0] = #VMOVDQA_256(D);
+	  
+	  D = #VMOVDQA_256(W[u256 2*i + 1]);
+	  D = #VPADD_4u64(D, Kp[u256 2*i + 1]);
+	  wc[u256 1] = #VMOVDQA_256(D);
+	  
+	  a, b, c, d, e, f, g, h = __sha_step(a, b, c, d, e, f, g, h, wc);
+  }
+  
+  tr = 16;
   msf_s = #mov_msf(msf);
-  while{cond = (tr < 80);msf = #mov_msf(msf_s);}(cond)
+  
+  while{cond = (tr < 80); msf = #mov_msf(msf_s);}(cond)
   {
     msf = #update_msf(cond, msf);
     msf_s = #mov_msf(msf);
     
-    //T1 = h + BSIG1(e) + CH(e,f,g) + Kt + Wt
-    T1  = h;
-    r   = __BSIG1_ref(e);
-    T1 += r;
-    r   = __CH_ref(e,f,g);
-    T1 += r;
-    T1 += Kp[(int)tr];
-    T1 += W[(int)tr];
-
-    //T2 = BSIG0(a) + MAJ(a,b,c)
-    T2  = __BSIG0_ref(a);
-    r   = __MAJ_ref(a,b,c);
-    T2 += r;
-
-    h  = g;
-    g  = f;
-    f  = e;
-    e  = d;
-    e += T1;
-    d  = c;
-    c  = b;
-    b  = a;
-    a  = T1;
-    a += T2;
-
-    tr+= 1;
+  	W, D = __Wt_part_avx(W, Kp, tr, 0);
+		wc[u256 0] = #VMOVDQA_256(D);
+		v_256 = #VMOVDQA_256(W[u256 0]);
+		W[u256 4] = #VMOVDQA_256(v_256);
+		
+		W, D = __Wt_part_avx(W, Kp, tr, 1);
+		wc[u256 1] = #VMOVDQA_256(D);
+		
+		a, b, c, d, e, f, g, h = __sha_step(a, b, c, d, e, f, g, h, wc);
+		
+		W, D = __Wt_part_avx(W, Kp, tr, 2);
+		wc[u256 0] = #VMOVDQA_256(D);
+		
+		W, D = __Wt_part_avx(W, Kp, tr, 3);
+		wc[u256 1] = #VMOVDQA_256(D);
+		
+		a, b, c, d, e, f, g, h = __sha_step(a, b, c, d, e, f, g, h, wc);
+		
+		
+    tr += 16;
   }
   msf = #mov_msf(msf_s);
 	msf = #update_msf(!cond, msf);
 
-  H = Hp;
   a += H[0];
   b += H[1];
   c += H[2];
@@ -239,37 +414,39 @@ inline fn __inner_sha(reg ptr u64[8] H, reg ptr u64[80] Kp, stack u64[80] W, #ms
   g += H[6];
   h += H[7];
 
-  H = __store_H_ref(H,a,b,c,d,e,f,g,h);
+  H = __store_H_ref(a, b, c, d, e, f, g, h);
   
   return H, msf;
 }
 
 
-fn _blocks_0_ref(reg ptr u64[25] pstate, #msf reg u64 msf) -> reg ptr u64[25], #msf reg u64
+inline fn _blocks_0_ref(reg ptr u64[25] pstate, #msf reg u64 msf) -> reg ptr u64[25], #msf reg u64
 {
 
   reg u256 bswap_256 v_256;
-  stack u64[80] W;
-  reg ptr u64[8] H;
+  stack u64[20] W;
+  stack u64[8] H;
   reg ptr u64[80] Kp;
   inline int t;
   
   
   Kp = SHA512_K;
   
-  H = pstate[16:8];
+  v_256 = #VMOVDQA_256(pstate[u256 4]);
+  H[u256 0] = #VMOVDQA_256(v_256);
+  v_256 = #VMOVDQA_256(pstate[u256 5]);
+  H[u256 1] = #VMOVDQA_256(v_256);
 	
+	// Absorb message and swap endianess
 	bswap_256 = bswap_indices;
+	
   for t=0 to 4
   { 
   	v_256 = #VMOVDQA_256(pstate[u256 t]);
   	v_256 = #VPSHUFB_256(v_256, bswap_256);
-    W[u256 t] = v_256;
+    W[u256 t] = #VMOVDQA_256(v_256);
   }
 	
-  for t=16 to 80
-  { W, msf = __Wt_ref(W, t, msf); }
-
   H, msf = __inner_sha(H, Kp, W, msf);
   
   v_256 = #VMOVDQA_256(H[u256 0]);
@@ -280,13 +457,15 @@ fn _blocks_0_ref(reg ptr u64[25] pstate, #msf reg u64 msf) -> reg ptr u64[25], #
   return pstate, msf;
 }
 
+
 #[sct="{ ptr: public, val: { n: d, s:secret } } * { ptr: public, val: { n: d, s:secret } } * secret * msf -> { ptr: public, val: { n: d, s:secret } } * { ptr: public, val: { n: d, s:secret } } * msf"]
 inline fn _blocks_1_ref(reg ptr u64[8] H, reg ptr u64[32] sblocks, reg u64 nblocks, #msf reg u64 msf) -> reg ptr u64[8], reg ptr u64[32], #msf reg u64
 {
   #public reg u8 is_last;
   #spill_to_mmx reg u64 i;
-  reg u256 bswap_256 c_256 i_256 v_256 z_256;
-  stack u64[80] W; 
+  reg u256 bswap_256 v_256;
+  stack u64[8] Hs;
+  stack u64[20] W; 
   reg ptr u64[80] Kp;
   reg bool less cond;
   inline int t;
@@ -294,6 +473,11 @@ inline fn _blocks_1_ref(reg ptr u64[8] H, reg ptr u64[32] sblocks, reg u64 nbloc
   
   Kp = SHA512_K;
   i = 0;
+  
+  v_256 = #VMOVDQA_256(H[u256 0]);
+  Hs[u256 0] = #VMOVDQA_256(v_256);
+  v_256 = #VMOVDQA_256(H[u256 1]);
+  Hs[u256 1] = #VMOVDQA_256(v_256);
   
   ?{"<u" = less} = #CMP(i, nblocks);
   #declassify is_last = #SETcc(less);
@@ -305,10 +489,6 @@ inline fn _blocks_1_ref(reg ptr u64[8] H, reg ptr u64[32] sblocks, reg u64 nbloc
     
     () = #spill(i);
     
-		z_256 = #set0_256();
-		i_256 = (256u)#VMOV_64(i);
-		i_256 = #VPBROADCAST_4u64(i_256);
-		c_256 = #VPCMPEQ_4u64(i_256, z_256);
 		bswap_256 = bswap_indices;
 		
     for t=0 to 4
@@ -316,23 +496,15 @@ inline fn _blocks_1_ref(reg ptr u64[8] H, reg ptr u64[32] sblocks, reg u64 nbloc
     	v_256 = #VMOVDQA_256(sblocks[u256 t]);
     	v_256 = #VPSHUFB_256(v_256, bswap_256);
       W[u256 t] = #VMOVDQA_256(v_256);
-    }
-    
-    for t=0 to 4
-    { 
-    	v_256 = #VMOVDQA_256(sblocks[u256 4 + t]);
-    	v_256 = #VPSHUFB_256(v_256, bswap_256);
-    	v_256 = #VPBLENDVB_256(v_256, W[u256 t], c_256);
-      W[u256 t] = #VMOVDQA_256(v_256);
+      
+      // Shift nblocks to the left
+      v_256 = #VMOVDQA_256(sblocks[u256 4+t]);
+      sblocks[u256 t] = #VMOVDQA_256(v_256);
     }
     
     sblocks_s = sblocks;
 		
-		
-    for t=16 to 80
-    { W, msf = __Wt_ref(W, t, msf); }
-		
-    H, msf = __inner_sha(H, Kp, W, msf);
+    Hs, msf = __inner_sha(Hs, Kp, W, msf);
 		
 		sblocks = sblocks_s;
     () = #unspill(i);
@@ -343,6 +515,11 @@ inline fn _blocks_1_ref(reg ptr u64[8] H, reg ptr u64[32] sblocks, reg u64 nbloc
   	is_last = #protect_8(is_last, msf);
   }
   msf = #update_msf(!cond, msf);
+	
+	v_256 = #VMOVDQA_256(Hs[u256 0]);
+	H[u256 0] = #VMOVDQA_256(v_256);
+	v_256 = #VMOVDQA_256(Hs[u256 1]);
+	H[u256 1] = #VMOVDQA_256(v_256);
 	
   return H, sblocks, msf;
 }
