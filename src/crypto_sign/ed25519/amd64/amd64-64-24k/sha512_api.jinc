@@ -71,6 +71,29 @@ inline fn shift_bytes(reg u256[4] m_buf, reg u256 block_offs_256 inv_lane_256 la
 	return m_shift;
 }
 
+inline fn shift_bytes_align(reg u256[4] m_buf, reg u256 block_offs_256)->reg u256[7]
+{
+	reg u256 cond_256;
+	reg u256[7] m_shift;
+	inline int k;
+	
+	for k=0 to 7
+	{
+		m_shift[k] = #set0_256();
+	}
+	
+	for k=0 to 4
+	{
+		cond_256 = #VPCMPEQ_4u64(block_offs_256, _0_4[k]);
+		m_shift[3+k]	= #VPBLENDVB_256(m_shift[3+k], m_buf[3], cond_256);
+		m_shift[2+k] 	= #VPBLENDVB_256(m_shift[2+k], m_buf[2], cond_256);
+		m_shift[1+k] 	= #VPBLENDVB_256(m_shift[1+k], m_buf[1], cond_256);
+		m_shift[k] 		= #VPBLENDVB_256(m_shift[k], m_buf[0], cond_256);
+	}
+	
+	return m_shift;
+}
+
 inline fn sha512_init(stack u64[25] pstate) -> stack u64[25]
 {
   inline int i;
@@ -352,9 +375,9 @@ fn sha512_update_ext(reg ptr u64[25] pstate, reg u64 m, reg u64 inlen, #msf reg 
 	reg u64 iterations mod_len total_len;
 	reg u64 j;
 	stack u64 m_s;
-	reg u256 block_offs_256 cond_256 inv_lane_256 lane_256 mask_256 modlen_256 shift_256 v_256;
+	reg u256 block_offs_256 cond_256 modlen_256;
 	reg u256[4] m_buf;
-	reg u256[8] m_shift;
+	reg u256[7] m_shift;
 	stack u64 j_s;
 	reg bool cond neq;
 	inline int k;
@@ -375,19 +398,7 @@ fn sha512_update_ext(reg ptr u64[25] pstate, reg u64 m, reg u64 inlen, #msf reg 
 	iterations = mod_len + inlen;
 	iterations = iterations >> 7;
 	
-	lane_256 = #VPAND_256(modlen_256, _16x3);
-	lane_256 = #VPCMPEQ_4u64(lane_256, _16x3);
-	lane_256 = #VPERMQ(lane_256, 0xf0);
-	inv_lane_256 = #VPERMQ(lane_256, 0x0f);
-	
 	modlen_256 = #VPBROADCAST_32u8(modlen_256);
-	
-	v_256 = _0_16x2;
-	shift_256 = #VPAND_256(modlen_256, _15x32);
-	shift_256 = #VPSUB_32u8(v_256, shift_256);
-	v_256 = _m1x32;
-	mask_256 = #VPCMPGT_32u8(shift_256, v_256);
-	shift_256 = #VPAND_256(shift_256, _15x32);
 	
 	j = iterations;
 	
@@ -410,7 +421,7 @@ fn sha512_update_ext(reg ptr u64[25] pstate, reg u64 m, reg u64 inlen, #msf reg 
 		m += 128;
 		m_s = m;
 		
-		m_shift = shift_bytes(m_buf, block_offs_256, inv_lane_256, lane_256, mask_256, shift_256);
+		m_shift = shift_bytes_align(m_buf, block_offs_256);
 		
 		for k=0 to 4
 		{
@@ -422,7 +433,7 @@ fn sha512_update_ext(reg ptr u64[25] pstate, reg u64 m, reg u64 inlen, #msf reg 
 		j_s = j;
 		pstate, msf = _blocks_0_ref(pstate, msf);
 		
-		for k=0 to 4
+		for k=0 to 3
 		{
 			pstate[u256 k] = #VMOVDQA_256(m_shift[4+k]);
 		}
@@ -443,7 +454,7 @@ fn sha512_update_ext(reg ptr u64[25] pstate, reg u64 m, reg u64 inlen, #msf reg 
 	m_buf[2] = (u256)[m + 64];
 	m_buf[3] = (u256)[m + 96];
 	
-	m_shift = shift_bytes(m_buf, block_offs_256, inv_lane_256, lane_256, mask_256, shift_256);
+	m_shift = shift_bytes_align(m_buf, block_offs_256);
 	
 	for k=0 to 4
 	{

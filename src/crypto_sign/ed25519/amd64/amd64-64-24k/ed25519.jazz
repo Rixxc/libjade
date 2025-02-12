@@ -18,6 +18,7 @@ export fn jade_ed25519_amd64_keygen(reg u64 skp pkp) -> reg u64
   stack u64[4] ks sks;
   stack u64[8] H;
   stack u64[25] state;
+  reg ptr u64[4] sks_ptr;
   #[sct="{ptr:public, val:secret}"] reg ptr u64[8] Hreg;
   #[sct="{ptr:public, val:secret}"] reg ptr u64[25] pstate;
   #msf reg u64 msf;
@@ -25,13 +26,17 @@ export fn jade_ed25519_amd64_keygen(reg u64 skp pkp) -> reg u64
   skps = skp;
   pkps = pkp;
 	
+	sks_ptr = sks;
+	
   while {
 		flag = 0;
-		sks, num_bytes = #randombytes(sks, flag);
+		sks_ptr = sks;
+		sks_ptr, num_bytes = #randombytes(sks_ptr, flag);
 	} (num_bytes != 32)
 	
 	msf = #init_msf();
 	
+	sks = sks_ptr;
 	sk = #copy(sks);
   
   skp = skps;
@@ -206,6 +211,7 @@ export fn jade_ed25519_amd64_sign(#transient reg u64 skp mp msg_len sigp) -> reg
   Hreg = H;
 	pstate_2 = state_2;
 	
+	#update_after_call
 	Hreg, msf = sha512_finalize(pstate_2, Hreg, msf);
 	H = Hreg;
   msf_s = #mov_msf(msf);
@@ -225,6 +231,7 @@ export fn jade_ed25519_amd64_sign(#transient reg u64 skp mp msg_len sigp) -> reg
 
 export fn jade_ed25519_amd64_verify(#transient reg u64 sigp pkp mp msg_len) -> reg u64
 {
+  reg u8 valid_r;
   reg u64 vrfy_res temp_64;
   reg u64[4] B R s A h_red;
   reg u64[4] s_enc r_enc;
@@ -319,8 +326,8 @@ export fn jade_ed25519_amd64_verify(#transient reg u64 sigp pkp mp msg_len) -> r
   r_enc, msf = __encode_point(xabc, yabc, zabc, msf);
   
   B = #copy(Bs);
-	valid = __cmp4_rr(r_enc, B);
-	temp_64 = (64u)valid;
+	valid_r = __cmp4_rr(r_enc, B);
+	temp_64 = (64u)valid_r;
 	vrfy_res = temp_64;
 	vrfy_res &= 0x1;
   
