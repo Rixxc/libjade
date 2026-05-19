@@ -2,16 +2,50 @@ require "curve25519.jinc"
 
 export fn jade_scalarmult_curve25519_amd64_mulx(reg u64 q n p) -> reg u64
 {
+  inline int i;
   reg u64 r;
-  __curve25519_mulx(q, n, p);
+  #msf reg u64 msf;
+  #spill_to_mmx reg u64 qs;
+  stack u8[32] k;
+  reg u64[4] u result;
+
+  msf = #init_msf();
+  qs = #protect(q, msf);
+  () = #spill(qs);
+
+  k = __decode_scalar(n);
+  u = __decode_u_coordinate4(p);
+  result = __curve25519_internal_mulx(k, u);
+
+  () = #unspill(qs);
+  for i=0 to 4
+  { [qs + 8*i] = result[i]; }
+
   ?{}, r = #set0();
   return r;
 }
 
 export fn jade_scalarmult_curve25519_amd64_mulx_base(reg u64 q n) -> reg u64
 {
+  inline int i;
   reg u64 r;
-  __curve25519_mulx_base(q, n);
+  #msf reg u64 msf;
+  #spill_to_mmx reg u64 qs;
+  stack u8[32] k;
+  reg u64[4] u result;
+
+  msf = #init_msf();
+  qs = #protect(q, msf);
+  () = #spill(qs);
+
+  k = __decode_scalar(n);
+  u = __decode_u_coordinate_base4();
+  result = __curve25519_internal_mulx(k, u);
+
+  () = #unspill(qs);
+  for i=0 to 4
+  { [qs + 8*i] = result[i]; }
+
   ?{}, r = #set0();
   return r;
 }
